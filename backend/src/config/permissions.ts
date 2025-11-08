@@ -13,6 +13,8 @@ export type Permission =
   | 'users:manage'
   | 'tenants:manage'
   | 'settings:branding'
+  | 'settings:terms'
+  | 'settings:classes'
   | 'students:manage'
   | 'teachers:manage'
   | 'school:manage';
@@ -39,6 +41,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     'users:invite',
     'users:manage',
     'settings:branding',
+    'settings:terms',
+    'settings:classes',
     'students:manage',
     'teachers:manage',
     'school:manage'
@@ -55,6 +59,8 @@ export const rolePermissions: Record<Role, Permission[]> = {
     'users:manage',
     'tenants:manage',
     'settings:branding',
+    'settings:terms',
+    'settings:classes',
     'students:manage',
     'teachers:manage',
     'school:manage'

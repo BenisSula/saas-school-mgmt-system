@@ -26,15 +26,17 @@ export async function upsertBranding(
   if (!existing) {
     const result = await client.query(
       `
-        INSERT INTO ${tableName(schema)} (logo_url, primary_color, secondary_color, theme_flags)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO ${tableName(schema)} (logo_url, primary_color, secondary_color, theme_flags, typography, navigation)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
       `,
       [
         payload.logoUrl ?? null,
         payload.primaryColor ?? null,
         payload.secondaryColor ?? null,
-        JSON.stringify(payload.themeFlags ?? {})
+        JSON.stringify(payload.themeFlags ?? {}),
+        JSON.stringify(payload.typography ?? {}),
+        JSON.stringify(payload.navigation ?? {})
       ]
     );
 
@@ -48,8 +50,10 @@ export async function upsertBranding(
           primary_color = $2,
           secondary_color = $3,
           theme_flags = $4,
+          typography = $5,
+          navigation = $6,
           updated_at = NOW()
-      WHERE id = $5
+      WHERE id = $7
       RETURNING *
     `,
     [
@@ -57,6 +61,8 @@ export async function upsertBranding(
       payload.primaryColor ?? existing.primary_color,
       payload.secondaryColor ?? existing.secondary_color,
       JSON.stringify(payload.themeFlags ?? existing.theme_flags ?? {}),
+      JSON.stringify(payload.typography ?? existing.typography ?? {}),
+      JSON.stringify(payload.navigation ?? existing.navigation ?? {}),
       existing.id
     ]
   );

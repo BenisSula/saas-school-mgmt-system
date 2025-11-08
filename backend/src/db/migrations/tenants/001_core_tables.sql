@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS {{schema}}.branding_settings (
   primary_color TEXT,
   secondary_color TEXT,
   theme_flags JSONB DEFAULT '{}'::jsonb,
+  typography JSONB DEFAULT '{}'::jsonb,
+  navigation JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -112,6 +114,25 @@ CREATE TABLE IF NOT EXISTS {{schema}}.exam_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (exam_id, class_id, subject)
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.academic_terms (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  starts_on DATE NOT NULL,
+  ends_on DATE NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.classes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS {{schema}}.grade_scales (

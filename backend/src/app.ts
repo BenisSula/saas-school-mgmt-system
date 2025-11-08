@@ -12,6 +12,8 @@ import gradesRouter from './routes/grades';
 import resultsRouter from './routes/results';
 import invoicesRouter from './routes/invoices';
 import paymentsRouter from './routes/payments';
+import configurationRouter from './routes/configuration';
+import reportsRouter from './routes/reports';
 import { errorHandler } from './middleware/errorHandler';
 import authenticate from './middleware/authenticate';
 import { requirePermission } from './middleware/rbac';
@@ -34,6 +36,8 @@ app.use('/grades', gradesRouter);
 app.use('/results', resultsRouter);
 app.use('/invoices', invoicesRouter);
 app.use('/payments', paymentsRouter);
+app.use('/configuration', configurationRouter);
+app.use('/reports', reportsRouter);
 
 app.get(
   '/admin/overview',
