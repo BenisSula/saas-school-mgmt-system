@@ -1,6 +1,6 @@
 # SaaS School Management System
 
-Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered project scaffolding; Phase 2 adds secure authentication, JWT sessions, and role-based access control across Student/Teacher/Admin/SuperAdmin personas. Phase 3 introduces schema-per-tenant onboarding, migrations, and request-scoped tenant resolution. Phase 4 layers on tenant-aware CRUD services for students, teachers, branding, and school profile. Phase 5 introduces attendance tracking APIs and UI stubs for teachers and students. Phase 6 adds exam scheduling, grade entry, ranking logic, and CSV/PDF export flows for tenant results.
+Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered project scaffolding; Phase 2 adds secure authentication, JWT sessions, and role-based access control across Student/Teacher/Admin/SuperAdmin personas. Phase 3 introduces schema-per-tenant onboarding, migrations, and request-scoped tenant resolution. Phase 4 layers on tenant-aware CRUD services for students, teachers, branding, and school profile. Phase 5 introduces attendance tracking APIs and UI stubs for teachers and students. Phase 6 adds exam scheduling, grade entry, ranking logic, and CSV/PDF export flows for tenant results. Phase 7 introduces fee invoicing and payment tracking with a pluggable provider abstraction plus new fee dashboards.
 
 ## Project Structure
 
@@ -130,6 +130,12 @@ npm run prepare
   - `GET /results/{studentId}?exam_id=` for aggregates, ranking, and grade summaries
   - `GET /results/{examId}/export?format=csv|pdf` for downloadable result sheets
   - Frontend stubs: `TeacherGradeEntryPage`, `StudentResultsPage`, `AdminExamConfigPage`
+- Fee management (Phase 7):
+  - `POST /invoices`, `GET /invoices/{studentId}`
+  - `POST /payments` webhook with idempotent persistence and invoice reconciliation
+  - Payment provider abstraction (`services/payments/provider.ts`) for Stripe/Paystack/Mollie drop-ins
+  - Frontend stubs: `StudentFeesPage`, `AdminInvoicePage`
+  - Jest coverage in `feeRoutes.test.ts`
 
 ## Testing
 
@@ -148,7 +154,7 @@ CI replicates these commands for pull requests.
 - Integrate real email/SMS providers for verification & reset flows.
 - Flesh out frontend routing and state management.
 - Add tenant onboarding automation (`POST /tenants`) and schema provisioning.
-- Integrate live exam data sources, teacher-class permissions, and fee modules.
+- Integrate live exam data sources, teacher-class permissions, and production payment providers.
 - Implement automated tenant backups and retention policies per schema.
-- Wire real attendance & exam data to UI, introduce pagination/filtering to reports, and connect to audit log storage.
+- Wire real attendance, exam, and fee data to UI, introduce pagination/filtering to reports, and connect to audit log storage.
 

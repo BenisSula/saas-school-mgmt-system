@@ -10,6 +10,8 @@ import attendanceRouter from './routes/attendance';
 import examsRouter from './routes/exams';
 import gradesRouter from './routes/grades';
 import resultsRouter from './routes/results';
+import invoicesRouter from './routes/invoices';
+import paymentsRouter from './routes/payments';
 import { errorHandler } from './middleware/errorHandler';
 import authenticate from './middleware/authenticate';
 import { requirePermission } from './middleware/rbac';
@@ -30,6 +32,8 @@ app.use('/attendance', attendanceRouter);
 app.use('/exams', examsRouter);
 app.use('/grades', gradesRouter);
 app.use('/results', resultsRouter);
+app.use('/invoices', invoicesRouter);
+app.use('/payments', paymentsRouter);
 
 app.get(
   '/admin/overview',

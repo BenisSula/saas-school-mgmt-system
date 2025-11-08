@@ -254,6 +254,42 @@ paths:
       responses:
         '200':
           description: Export streamed
+  /invoices:
+    post:
+      summary: Create invoice for a student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceInput'
+      responses:
+        '201':
+          description: Invoice created
+  /invoices/{studentId}:
+    get:
+      summary: List invoices for student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of invoices
+  /payments:
+    post:
+      summary: Payment webhook endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhook'
+      responses:
+        '200':
+          description: Webhook processed
 components:
   parameters:
     Id:
@@ -474,4 +510,57 @@ components:
                 type: string
               position:
                 type: integer
+    InvoiceInput:
+      type: object
+      properties:
+        studentId:
+          type: string
+        dueDate:
+          type: string
+          format: date-time
+        currency:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              amount:
+                type: number
+              metadata:
+                type: object
+                additionalProperties: true
+            required:
+              - description
+              - amount
+      required:
+        - studentId
+        - items
+    PaymentWebhook:
+      type: object
+      properties:
+        provider:
+          type: string
+        type:
+          type: string
+        paymentId:
+          type: string
+        invoiceId:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - provider
+        - paymentId
+        - invoiceId
 
