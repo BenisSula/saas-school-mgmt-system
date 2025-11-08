@@ -61,11 +61,35 @@ CREATE TABLE IF NOT EXISTS {{schema}}.fee_invoices (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   student_id UUID REFERENCES {{schema}}.students(id) ON DELETE CASCADE,
   amount NUMERIC(12,2) NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('pending', 'paid', 'overdue', 'refunded')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'partial', 'paid', 'overdue', 'refunded')),
   due_date DATE,
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.fee_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id UUID REFERENCES {{schema}}.fee_invoices(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.payments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id UUID REFERENCES {{schema}}.fee_invoices(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  provider_payment_id TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  currency TEXT DEFAULT 'USD',
+  status TEXT NOT NULL CHECK (status IN ('pending', 'succeeded', 'failed', 'refunded')),
+  metadata JSONB DEFAULT '{}'::jsonb,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (provider, provider_payment_id)
 );
 
 CREATE TABLE IF NOT EXISTS {{schema}}.exams (
