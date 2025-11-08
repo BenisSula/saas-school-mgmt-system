@@ -1,20 +1,32 @@
 import type { PoolClient } from 'pg';
 import { BrandingInput } from '../validators/brandingValidator';
+import { assertValidSchemaName } from '../db/tenantManager';
 
 const table = 'branding_settings';
 
-export async function getBranding(client: PoolClient) {
-  const result = await client.query(`SELECT * FROM ${table} ORDER BY updated_at DESC LIMIT 1`);
+function tableName(schema: string): string {
+  assertValidSchemaName(schema);
+  return `${schema}.${table}`;
+}
+
+export async function getBranding(client: PoolClient, schema: string) {
+  const result = await client.query(
+    `SELECT * FROM ${tableName(schema)} ORDER BY updated_at DESC LIMIT 1`
+  );
   return result.rows[0] ?? null;
 }
 
-export async function upsertBranding(client: PoolClient, payload: BrandingInput) {
-  const existing = await getBranding(client);
+export async function upsertBranding(
+  client: PoolClient,
+  schema: string,
+  payload: BrandingInput
+) {
+  const existing = await getBranding(client, schema);
 
   if (!existing) {
     const result = await client.query(
       `
-        INSERT INTO ${table} (logo_url, primary_color, secondary_color, theme_flags)
+        INSERT INTO ${tableName(schema)} (logo_url, primary_color, secondary_color, theme_flags)
         VALUES ($1, $2, $3, $4)
         RETURNING *
       `,
@@ -31,7 +43,7 @@ export async function upsertBranding(client: PoolClient, payload: BrandingInput)
 
   const result = await client.query(
     `
-      UPDATE ${table}
+      UPDATE ${tableName(schema)}
       SET logo_url = $1,
           primary_color = $2,
           secondary_color = $3,

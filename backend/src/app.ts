@@ -6,6 +6,7 @@ import studentsRouter from './routes/students';
 import teachersRouter from './routes/teachers';
 import brandingRouter from './routes/branding';
 import schoolRouter from './routes/school';
+import attendanceRouter from './routes/attendance';
 import { errorHandler } from './middleware/errorHandler';
 import authenticate from './middleware/authenticate';
 import { requirePermission } from './middleware/rbac';
@@ -22,6 +23,7 @@ app.use('/students', studentsRouter);
 app.use('/teachers', teachersRouter);
 app.use('/branding', brandingRouter);
 app.use('/school', schoolRouter);
+app.use('/attendance', attendanceRouter);
 
 app.get(
   '/admin/overview',

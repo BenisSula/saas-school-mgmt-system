@@ -108,6 +108,56 @@ paths:
         '200':
           description: Branding updated
   /school:
+  /attendance/mark:
+    post:
+      summary: Bulk mark attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AttendanceMark'
+      responses:
+        '204':
+          description: Attendance recorded
+  /attendance/{studentId}:
+    get:
+      summary: Get student attendance history
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Attendance history
+  /attendance/report/class:
+    get:
+      summary: Class attendance report for date
+      parameters:
+        - name: class_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report per status
     get:
       summary: Get school profile
       responses:
@@ -203,4 +253,27 @@ components:
           additionalProperties: true
       required:
         - name
+    AttendanceMark:
+      type: object
+      properties:
+        studentId:
+          type: string
+        classId:
+          type: string
+        status:
+          type: string
+          enum: [present, absent, late]
+        markedBy:
+          type: string
+        date:
+          type: string
+          format: date
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - studentId
+        - status
+        - markedBy
+        - date
 

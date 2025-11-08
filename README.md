@@ -1,6 +1,6 @@
 # SaaS School Management System
 
-Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered project scaffolding; Phase 2 adds secure authentication, JWT sessions, and role-based access control across Student/Teacher/Admin/SuperAdmin personas. Phase 3 introduces schema-per-tenant onboarding, migrations, and request-scoped tenant resolution. Phase 4 layers on tenant-aware CRUD services for students, teachers, branding, and school profile.
+Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered project scaffolding; Phase 2 adds secure authentication, JWT sessions, and role-based access control across Student/Teacher/Admin/SuperAdmin personas. Phase 3 introduces schema-per-tenant onboarding, migrations, and request-scoped tenant resolution. Phase 4 layers on tenant-aware CRUD services for students, teachers, branding, and school profile. Phase 5 introduces attendance tracking APIs and UI stubs for teachers and students.
 
 ## Project Structure
 
@@ -118,6 +118,13 @@ npm run prepare
 - Business logic isolated in `services/` modules; controllers stay thin.
 - Jest coverage in `studentRoutes.test.ts` and `teacherBrandingRoutes.test.ts`.
 
+- Attendance APIs (Phase 5):
+  - `POST /attendance/mark` (bulk, idempotent)
+  - `GET /attendance/{studentId}` (history + summary)
+  - `GET /attendance/report/class?class_id=&date=`
+  - Teacher UI stub: `TeacherAttendancePage`
+  - Student UI stub: `StudentAttendancePage`
+
 ## Testing
 
 ```bash
@@ -135,6 +142,7 @@ CI replicates these commands for pull requests.
 - Integrate real email/SMS providers for verification & reset flows.
 - Flesh out frontend routing and state management.
 - Add tenant onboarding automation (`POST /tenants`) and schema provisioning.
-- Extend CRUD coverage to attendance, exams, fee modules, and add end-to-end auth flows.
+- Extend CRUD coverage to exams, fee modules, and add end-to-end auth flows.
 - Implement automated tenant backups and retention policies per schema.
+- Wire real attendance data to UI, introduce pagination/filtering to reports, and connect to audit log storage.
 
