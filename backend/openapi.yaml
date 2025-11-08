@@ -90,14 +90,18 @@ paths:
       responses:
         '204':
           description: Deleted
-  /branding:
+  /configuration/branding:
     get:
-      summary: Get branding
+      summary: Get tenant branding configuration
       responses:
         '200':
-          description: Branding config
+          description: Branding config for current tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrandingConfig'
     put:
-      summary: Upsert branding
+      summary: Upsert tenant branding configuration
       requestBody:
         required: true
         content:
@@ -107,6 +111,52 @@ paths:
       responses:
         '200':
           description: Branding updated
+  /configuration/terms:
+    get:
+      summary: List academic terms
+      responses:
+        '200':
+          description: Academic terms for tenant
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AcademicTerm'
+    post:
+      summary: Create or update academic term
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcademicTermInput'
+      responses:
+        '201':
+          description: Academic term created
+  /configuration/classes:
+    get:
+      summary: List classes
+      responses:
+        '200':
+          description: Classes for tenant
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClassRecord'
+    post:
+      summary: Create or update class
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassInput'
+      responses:
+        '201':
+          description: Class created
   /school:
   /attendance/mark:
     post:
@@ -158,6 +208,71 @@ paths:
       responses:
         '200':
           description: Report per status
+  /reports/attendance:
+    get:
+      summary: Aggregate attendance between dates
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: class_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Aggregated attendance rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceAggregate'
+  /reports/grades:
+    get:
+      summary: Grade distribution for exam
+      parameters:
+        - name: exam_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Grade aggregate rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GradeAggregate'
+        '400':
+          description: Missing exam id
+  /reports/fees:
+    get:
+      summary: Outstanding fee summary
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, partial, paid, overdue, refunded]
+      responses:
+        '200':
+          description: Fee aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeeAggregate'
     get:
       summary: Get school profile
       responses:
@@ -290,6 +405,42 @@ paths:
       responses:
         '200':
           description: Webhook processed
+  /users:
+    get:
+      summary: List users for current tenant
+      responses:
+        '200':
+          description: Tenant users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TenantUser'
+  /users/{userId}/role:
+    patch:
+      summary: Update user role
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdate'
+      responses:
+        '200':
+          description: Updated tenant user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantUser'
+        '404':
+          description: User not found in tenant
 components:
   parameters:
     Id:
@@ -359,6 +510,12 @@ components:
           type: object
           additionalProperties:
             type: boolean
+        typography:
+          type: object
+          additionalProperties: true
+        navigation:
+          type: object
+          additionalProperties: true
     SchoolInput:
       type: object
       properties:
@@ -369,6 +526,72 @@ components:
           additionalProperties: true
       required:
         - name
+    BrandingConfig:
+      type: object
+      properties:
+        logo_url:
+          type: string
+          format: uri
+        primary_color:
+          type: string
+        secondary_color:
+          type: string
+        theme_flags:
+          type: object
+          additionalProperties:
+            type: boolean
+        typography:
+          type: object
+          additionalProperties: true
+        navigation:
+          type: object
+          additionalProperties: true
+    AcademicTermInput:
+      type: object
+      required:
+        - name
+        - startsOn
+        - endsOn
+      properties:
+        name:
+          type: string
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+    AcademicTerm:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        starts_on:
+          type: string
+          format: date
+        ends_on:
+          type: string
+          format: date
+    ClassInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    ClassRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
     AttendanceMark:
       type: object
       properties:
@@ -563,4 +786,74 @@ components:
         - provider
         - paymentId
         - invoiceId
+    AttendanceAggregate:
+      type: object
+      properties:
+        attendance_date:
+          type: string
+          format: date
+        class_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+        count:
+          type: integer
+    GradeAggregate:
+      type: object
+      properties:
+        subject:
+          type: string
+        grade:
+          type: string
+        count:
+          type: integer
+        average_score:
+          type: number
+          format: float
+    FeeAggregate:
+      type: object
+      properties:
+        status:
+          type: string
+        invoice_count:
+          type: integer
+        total_amount:
+          type: number
+          format: float
+        total_paid:
+          type: number
+          format: float
+    TenantUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - student
+            - teacher
+            - admin
+            - superadmin
+        is_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    UserRoleUpdate:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum:
+            - student
+            - teacher
+            - admin
+            - superadmin
 

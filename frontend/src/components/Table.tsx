@@ -39,15 +39,33 @@ export function Table<T>({ columns, data, emptyMessage = 'No records found.' }: 
         <tbody className="divide-y divide-slate-800 bg-slate-950/40">
           {data.map((row, index) => (
             <tr key={index} className="hover:bg-slate-900/80">
-              {columns.map((column, columnIndex) => (
-                <td key={column.key ? String(column.key) : `${index}-${columnIndex}`} className="px-4 py-3">
-                  {column.render
-                    ? column.render(row)
-                    : column.key
-                      ? String(row[column.key] ?? '')
-                      : ''}
-                </td>
-              ))}
+              {columns.map((column, columnIndex) => {
+                const key = column.key ? String(column.key) : `${index}-${columnIndex}`;
+                if (column.render) {
+                  return (
+                    <td key={key} className="px-4 py-3">
+                      {column.render(row)}
+                    </td>
+                  );
+                }
+
+                if (!column.key) {
+                  return (
+                    <td key={key} className="px-4 py-3">
+                      ''
+                    </td>
+                  );
+                }
+
+                const value = (row as Record<string, unknown>)[column.key as string];
+                return (
+                  <td key={key} className="px-4 py-3">
+                    {React.isValidElement(value) || typeof value === 'object'
+                      ? value ?? ''
+                      : String(value ?? '')}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>

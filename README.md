@@ -1,6 +1,6 @@
 # SaaS School Management System
 
-Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered project scaffolding; Phase 2 adds secure authentication, JWT sessions, and role-based access control across Student/Teacher/Admin/SuperAdmin personas. Phase 3 introduces schema-per-tenant onboarding, migrations, and request-scoped tenant resolution. Phase 4 layers on tenant-aware CRUD services for students, teachers, branding, and school profile. Phase 5 introduces attendance tracking APIs and UI stubs for teachers and students. Phase 6 adds exam scheduling, grade entry, ranking logic, and CSV/PDF export flows for tenant results. Phase 7 introduces fee invoicing and payment tracking with a pluggable provider abstraction plus new fee dashboards.
+Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered project scaffolding; Phase 2 adds secure authentication, JWT sessions, and role-based access control across Student/Teacher/Admin/SuperAdmin personas. Phase 3 introduces schema-per-tenant onboarding, migrations, and request-scoped tenant resolution. Phase 4 layers on tenant-aware CRUD services for students, teachers, branding, and school profile. Phase 5 introduces attendance tracking APIs and UI stubs for teachers and students. Phase 6 adds exam scheduling, grade entry, ranking logic, and CSV/PDF export flows for tenant results. Phase 7 introduces fee invoicing and payment tracking with a pluggable provider abstraction plus new fee dashboards. **Phase 8** delivers admin configuration, reporting endpoints, and live React admin tooling (branding, academic calendar, RBAC management, and multi-module reports).
 
 ## Project Structure
 
@@ -43,7 +43,7 @@ Monorepo scaffold for the SaaS School Management Portal. Phase 1 delivered proje
    ```bash
    npm run dev --prefix frontend
    ```
-   The frontend points to the backend via `VITE_API_BASE_URL`.
+   The frontend points to the backend via `VITE_API_URL` (defaults to `http://localhost:3001`). You can also configure `VITE_TENANT_ID` (default `tenant_alpha`) and `VITE_API_TOKEN` if you want the browser to send a pre-generated bearer token while manual auth flows are still being wired.
 
 ## Docker Compose
 
@@ -137,6 +137,14 @@ npm run prepare
   - Frontend stubs: `StudentFeesPage`, `AdminInvoicePage`
   - Jest coverage in `feeRoutes.test.ts`
 
+- Admin configuration & reporting (Phase 8):
+  - `GET/PUT /configuration/branding`, `GET/POST /configuration/terms`, `GET/POST /configuration/classes`
+  - `GET /reports/attendance`, `GET /reports/grades?exam_id=`, `GET /reports/fees?status=`
+  - `GET /users`, `PATCH /users/{userId}/role` for tenant RBAC management
+  - React admin hub at `/frontend/src/App.tsx` with live pages: `AdminConfigurationPage`, `AdminReportsPage`, `AdminRoleManagementPage`
+  - Vitest coverage in `adminConfig.test.tsx`, `adminReports.test.tsx`, and `adminRoles.test.tsx`
+  - New backend integration tests: `configRoutes.test.ts`, `reportRoutes.test.ts`, `userRoutes.test.ts`
+
 ## Testing
 
 ```bash
@@ -152,9 +160,8 @@ CI replicates these commands for pull requests.
 ## Next Steps
 
 - Integrate real email/SMS providers for verification & reset flows.
-- Flesh out frontend routing and state management.
-- Add tenant onboarding automation (`POST /tenants`) and schema provisioning.
+- Flesh out production-ready frontend routing/state (React Router + TanStack Query).
+- Add tenant onboarding automation (`POST /tenants`) and schema provisioning CLI.
 - Integrate live exam data sources, teacher-class permissions, and production payment providers.
-- Implement automated tenant backups and retention policies per schema.
-- Wire real attendance, exam, and fee data to UI, introduce pagination/filtering to reports, and connect to audit log storage.
+- Implement automated tenant backups, retention policies, and observability dashboards.
 
