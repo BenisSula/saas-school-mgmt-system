@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Moon, Sun } from 'lucide-react';
 import { useBrand } from './BrandProvider';
 
-export function ThemeToggle() {
+const ThemeToggleComponent = function ThemeToggle() {
   const { theme, toggleTheme } = useBrand();
   const isDark = theme === 'dark';
 
@@ -28,7 +28,9 @@ export function ThemeToggle() {
       </motion.span>
     </motion.button>
   );
-}
+};
+
+export const ThemeToggle = React.memo(ThemeToggleComponent);
+ThemeToggle.displayName = 'ThemeToggle';
 
 export default ThemeToggle;
-

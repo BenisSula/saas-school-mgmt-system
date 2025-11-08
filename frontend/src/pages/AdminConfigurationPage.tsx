@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import { toast } from 'sonner';
 import { api, type AcademicTerm, type BrandingConfig, type SchoolClass } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Table } from '../components/ui/Table';
@@ -7,6 +9,8 @@ import { Select } from '../components/ui/Select';
 import { DatePicker } from '../components/ui/DatePicker';
 import { StatusBanner } from '../components/ui/StatusBanner';
 import { useAsyncFeedback } from '../hooks/useAsyncFeedback';
+import { sanitizeText } from '../lib/sanitize';
+import { useAuth } from '../context/AuthContext';
 
 interface BrandingFormState {
   logoUrl: string;
@@ -23,6 +27,7 @@ const defaultBranding: BrandingFormState = {
 };
 
 function AdminConfigurationPage() {
+  const { user } = useAuth();
   const [branding, setBranding] = useState<BrandingFormState>(defaultBranding);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -32,6 +37,7 @@ function AdminConfigurationPage() {
   const { status, message, setSuccess, setError, clear } = useAsyncFeedback();
 
   useEffect(() => {
+    if (!user) return;
     let isMounted = true;
     (async () => {
       try {
@@ -54,12 +60,13 @@ function AdminConfigurationPage() {
         setClasses(classesResponse);
       } catch (error) {
         setError((error as Error).message);
+        toast.error((error as Error).message);
       }
     })();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user, setError]);
 
   const brandingColumns = useMemo(
     () => [
@@ -93,9 +100,10 @@ function AdminConfigurationPage() {
       { key: 'Secondary Color', value: branding.secondaryColor || 'Not set' },
       {
         key: 'Theme Flags',
-        value: Object.entries(branding.themeFlags)
-          .map(([flag, enabled]) => `${flag}: ${enabled ? 'on' : 'off'}`)
-          .join(', ') || 'Not set'
+        value:
+          Object.entries(branding.themeFlags)
+            .map(([flag, enabled]) => `${flag}: ${enabled ? 'on' : 'off'}`)
+            .join(', ') || 'Not set'
       }
     ],
     [branding]
@@ -106,47 +114,60 @@ function AdminConfigurationPage() {
       setLoading(true);
       clear();
       const payload: Partial<BrandingConfig> = {
-        logo_url: branding.logoUrl,
-        primary_color: branding.primaryColor,
-        secondary_color: branding.secondaryColor,
+        logo_url: sanitizeText(branding.logoUrl),
+        primary_color: sanitizeText(branding.primaryColor),
+        secondary_color: sanitizeText(branding.secondaryColor),
         theme_flags: branding.themeFlags
       };
       await api.updateBranding(payload);
       setSuccess('Branding saved.');
+      toast.success('Branding updated');
     } catch (error) {
       setError((error as Error).message);
+      toast.error((error as Error).message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCreateTerm(event: React.FormEvent) {
+  async function handleCreateTerm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
       setLoading(true);
       clear();
-      const created = await api.createTerm(termForm);
+      const created = await api.createTerm({
+        name: sanitizeText(termForm.name),
+        startsOn: termForm.startsOn,
+        endsOn: termForm.endsOn
+      });
       setTerms((current) => [created, ...current]);
       setTermForm({ name: '', startsOn: '', endsOn: '' });
       setSuccess('Academic term recorded.');
+      toast.success('Academic term added.');
     } catch (error) {
       setError((error as Error).message);
+      toast.error((error as Error).message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCreateClass(event: React.FormEvent) {
+  async function handleCreateClass(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
       setLoading(true);
       clear();
-      const created = await api.createClass(classForm);
+      const created = await api.createClass({
+        name: sanitizeText(classForm.name),
+        description: sanitizeText(classForm.description)
+      });
       setClasses((current) => [created, ...current]);
       setClassForm({ name: '', description: '' });
       setSuccess('Class saved.');
+      toast.success('Class saved.');
     } catch (error) {
       setError((error as Error).message);
+      toast.error((error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -249,9 +270,7 @@ function AdminConfigurationPage() {
             label="End date"
             required
             value={termForm.endsOn}
-            onChange={(event) =>
-              setTermForm((state) => ({ ...state, endsOn: event.target.value }))
-            }
+            onChange={(event) => setTermForm((state) => ({ ...state, endsOn: event.target.value }))}
           />
           <Button type="submit" loading={loading} className="self-end">
             Add term
@@ -275,9 +294,7 @@ function AdminConfigurationPage() {
             placeholder="Grade 9"
             required
             value={classForm.name}
-            onChange={(event) =>
-              setClassForm((state) => ({ ...state, name: event.target.value }))
-            }
+            onChange={(event) => setClassForm((state) => ({ ...state, name: event.target.value }))}
           />
           <Input
             label="Description"
@@ -300,4 +317,3 @@ function AdminConfigurationPage() {
 }
 
 export default AdminConfigurationPage;
-

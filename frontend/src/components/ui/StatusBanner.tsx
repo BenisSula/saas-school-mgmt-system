@@ -14,17 +14,13 @@ const STATUS_STYLES: Record<StatusBannerStatus, string> = {
   error: 'border border-red-500 bg-red-500/10 text-red-100'
 };
 
-export function StatusBanner({ status, message, onDismiss }: StatusBannerProps) {
+const StatusBannerComponent = ({ status, message, onDismiss }: StatusBannerProps) => {
   const baseClasses =
     'flex items-start justify-between gap-4 rounded-md px-4 py-3 text-sm backdrop-blur transition-colors duration-200';
   const statusClasses = STATUS_STYLES[status];
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`${baseClasses} ${statusClasses}`}
-    >
+    <div role="status" aria-live="polite" className={`${baseClasses} ${statusClasses}`}>
       <span>{message}</span>
       {onDismiss ? (
         <button
@@ -38,7 +34,9 @@ export function StatusBanner({ status, message, onDismiss }: StatusBannerProps) 
       ) : null}
     </div>
   );
-}
+};
+
+export const StatusBanner = React.memo(StatusBannerComponent);
+StatusBanner.displayName = 'StatusBanner';
 
 export default StatusBanner;
-

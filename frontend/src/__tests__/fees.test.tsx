@@ -8,7 +8,7 @@ describe('Fee pages', () => {
     render(<StudentFeesPage />);
     expect(screen.getByText(/Fee Dashboard/i)).toBeInTheDocument();
     expect(screen.getByText(/Outstanding Balance/i)).toBeInTheDocument();
-    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByText(/No invoices issued yet/i)).toBeInTheDocument();
   });
 
   it('allows admin to add invoice items', () => {
@@ -20,4 +20,3 @@ describe('Fee pages', () => {
     expect(textInputs.length).toBeGreaterThan(1);
   });
 });
-

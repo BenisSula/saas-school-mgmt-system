@@ -14,7 +14,8 @@ describe('Exam pages', () => {
   it('renders student results summary', () => {
     render(<StudentResultsPage />);
     expect(screen.getByText(/My Exam Results/i)).toBeInTheDocument();
-    expect(screen.getByText(/Total Score/i)).toBeInTheDocument();
+    expect(screen.getByText(/Load an exam to see per-subject results/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Load results/i })).toBeInTheDocument();
   });
 
   it('renders admin configuration tools', () => {
@@ -23,4 +24,3 @@ describe('Exam pages', () => {
     expect(screen.getByText(/Upcoming Exams/i)).toBeInTheDocument();
   });
 });
-

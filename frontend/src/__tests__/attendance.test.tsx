@@ -12,8 +12,7 @@ describe('Attendance pages', () => {
 
   it('renders student attendance summary', () => {
     render(<StudentAttendancePage />);
-    expect(screen.getByText(/Attendance Summary/i)).toBeInTheDocument();
+    expect(screen.getByText(/Your attendance/i)).toBeInTheDocument();
     expect(screen.getByText(/Attendance %/i)).toBeInTheDocument();
   });
 });
-

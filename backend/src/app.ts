@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import tenantsRouter from './routes/tenants';
@@ -21,6 +22,17 @@ import { requirePermission } from './middleware/rbac';
 import { tenantResolver } from './middleware/tenantResolver';
 
 const app = express();
+
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+  : ['http://localhost:5173', 'http://localhost:5175'];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true
+  })
+);
 
 app.use(express.json());
 
@@ -57,4 +69,3 @@ app.get(
 app.use(errorHandler);
 
 export default app;
-

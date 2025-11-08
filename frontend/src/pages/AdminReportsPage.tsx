@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { api, type AttendanceAggregate, type FeeAggregate, type GradeAggregate } from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Table } from '../components/ui/Table';
@@ -7,6 +8,7 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { Select } from '../components/ui/Select';
 import { StatusBanner } from '../components/ui/StatusBanner';
 import { useAsyncFeedback } from '../hooks/useAsyncFeedback';
+import { sanitizeIdentifier } from '../lib/sanitize';
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -77,8 +79,11 @@ function AdminReportsPage() {
       } else {
         setSuccess('Attendance report updated.');
       }
+      toast.success('Attendance report refreshed.');
     } catch (error) {
-      setError((error as Error).message);
+      const message = (error as Error).message;
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -99,8 +104,11 @@ function AdminReportsPage() {
       } else {
         setSuccess('Grade report updated.');
       }
+      toast.success('Grade report refreshed.');
     } catch (error) {
-      setError((error as Error).message);
+      const message = (error as Error).message;
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -117,8 +125,11 @@ function AdminReportsPage() {
       } else {
         setSuccess('Fee report updated.');
       }
+      toast.success('Fee report refreshed.');
     } catch (error) {
-      setError((error as Error).message);
+      const message = (error as Error).message;
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -176,7 +187,10 @@ function AdminReportsPage() {
             placeholder="e.g. grade-10"
             value={attendanceFilters.classId}
             onChange={(event) =>
-              setAttendanceFilters((state) => ({ ...state, classId: event.target.value }))
+              setAttendanceFilters((state) => ({
+                ...state,
+                classId: sanitizeIdentifier(event.target.value)
+              }))
             }
           />
         </div>
@@ -211,7 +225,7 @@ function AdminReportsPage() {
             label="Exam ID"
             placeholder="exam-123"
             value={examId}
-            onChange={(event) => setExamId(event.target.value)}
+            onChange={(event) => setExamId(sanitizeIdentifier(event.target.value))}
           />
           <p className="text-xs text-slate-400">
             Use the exam ID from the examinations module. Future iterations will provide a picker.
@@ -267,4 +281,3 @@ function AdminReportsPage() {
 }
 
 export default AdminReportsPage;
-

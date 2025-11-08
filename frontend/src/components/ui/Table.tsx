@@ -1,11 +1,11 @@
-import React from 'react';
+import { isValidElement, memo, type CSSProperties, type ReactNode } from 'react';
 import { useBrand } from './BrandProvider';
 
 export interface TableColumn<T> {
-  key?: keyof T;
+  key?: keyof T | string;
   header: string;
   align?: 'left' | 'center' | 'right';
-  render?: (row: T) => React.ReactNode;
+  render?: (row: T, rowIndex?: number, columnIndex?: number) => ReactNode;
 }
 
 export interface TableProps<T> {
@@ -16,7 +16,7 @@ export interface TableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-export function Table<T>({
+function TableComponent<T>({
   columns,
   data,
   caption,
@@ -39,7 +39,7 @@ export function Table<T>({
         {
           '--brand-secondary': tokens.secondary,
           '--brand-secondary-contrast': tokens.secondaryContrast
-        } as React.CSSProperties
+        } as CSSProperties
       }
     >
       <table className="min-w-full divide-y divide-slate-800 text-left text-sm text-slate-200">
@@ -53,6 +53,7 @@ export function Table<T>({
             {columns.map((column, columnIndex) => (
               <th
                 key={column.key ? String(column.key) : `header-${columnIndex}`}
+                scope="col"
                 className={`px-4 py-3 font-semibold uppercase tracking-wide text-xs ${
                   column.align === 'center'
                     ? 'text-center'
@@ -103,10 +104,14 @@ export function Table<T>({
                     }`}
                   >
                     {column.render
-                      ? column.render(row)
-                      : React.isValidElement(value) || typeof value === 'object'
-                        ? value ?? ''
-                        : String(value ?? '')}
+                      ? column.render(row, rowIndex, columnIndex)
+                      : isValidElement(value)
+                        ? value
+                        : value === null || value === undefined
+                          ? ''
+                          : typeof value === 'object'
+                            ? JSON.stringify(value)
+                            : String(value)}
                   </td>
                 );
               })}
@@ -118,6 +123,7 @@ export function Table<T>({
   );
 }
 
-export default Table;
+const MemoizedTable = memo(TableComponent) as typeof TableComponent;
 
-
+export const Table = MemoizedTable;
+export default MemoizedTable;

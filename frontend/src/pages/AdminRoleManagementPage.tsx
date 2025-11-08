@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { api, type TenantUser } from '../lib/api';
 import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
@@ -13,7 +14,7 @@ function AdminRoleManagementPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const { status, message, setInfo, setSuccess, setError, clear } = useAsyncFeedback();
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       clear();
@@ -21,17 +22,21 @@ function AdminRoleManagementPage() {
       setUsers(data);
       if (data.length === 0) {
         setInfo('No users found for this tenant.');
+      } else {
+        toast.success('Loaded latest users.');
       }
     } catch (error) {
-      setError((error as Error).message);
+      const message = (error as Error).message;
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  }
+  }, [clear, setError, setInfo]);
 
   useEffect(() => {
     void loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   const columns = useMemo(
     () => [
@@ -62,11 +67,16 @@ function AdminRoleManagementPage() {
             clear();
             const updated = await api.updateUserRole(user.id, nextRole);
             setUsers((current) =>
-              current.map((entry) => (entry.id === user.id ? { ...entry, role: updated.role } : entry))
+              current.map((entry) =>
+                entry.id === user.id ? { ...entry, role: updated.role } : entry
+              )
             );
             setSuccess(`Role updated for ${user.email}`);
+            toast.success(`Role updated for ${user.email}`);
           } catch (error) {
-            setError((error as Error).message);
+            const message = (error as Error).message;
+            setError(message);
+            toast.error(message);
           } finally {
             setLoading(false);
           }
@@ -81,7 +91,8 @@ function AdminRoleManagementPage() {
         <div>
           <h1 className="text-2xl font-semibold">Role management</h1>
           <p className="text-sm text-slate-300">
-            View tenant users and adjust their role assignment. Only admins and superadmins can modify roles.
+            View tenant users and adjust their role assignment. Only admins and superadmins can
+            modify roles.
           </p>
         </div>
         <Button onClick={loadUsers} loading={loading}>
@@ -97,4 +108,3 @@ function AdminRoleManagementPage() {
 }
 
 export default AdminRoleManagementPage;
-

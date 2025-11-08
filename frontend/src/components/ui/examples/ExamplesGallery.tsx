@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrandProvider } from '../BrandProvider';
 import { Button } from '../Button';
 import { Input } from '../Input';
@@ -60,5 +59,3 @@ export function ExamplesGallery() {
 }
 
 export default ExamplesGallery;
-
-

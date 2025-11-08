@@ -3,12 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, LogOut, Settings, User, UserCircle } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { useBrand } from './BrandProvider';
+import type { AuthUser, Role } from '../../lib/api';
 
 export interface NavigationLink {
   label: string;
   icon: React.ReactNode;
   onSelect: () => void;
   isActive?: boolean;
+  allowedRoles?: Role[];
 }
 
 export interface NavbarProps {
@@ -17,6 +19,9 @@ export interface NavbarProps {
   links: NavigationLink[];
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
+  user: AuthUser | null;
+  onLogout: () => void;
+  onShowAuthPanel?: () => void;
 }
 
 const navItemVariants = {
@@ -24,12 +29,15 @@ const navItemVariants = {
   visible: { opacity: 1, y: 0 }
 };
 
-export function Navbar({
+function NavbarComponent({
   brandName,
   brandSubtitle,
   links,
   onToggleSidebar,
-  sidebarOpen
+  sidebarOpen,
+  user,
+  onLogout,
+  onShowAuthPanel
 }: NavbarProps) {
   const { tokens } = useBrand();
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
@@ -84,7 +92,9 @@ export function Navbar({
               {brandInitials}
             </motion.div>
             <div className="hidden sm:block">
-              <p className="text-sm font-semibold text-[var(--brand-surface-contrast)]">{brandName}</p>
+              <p className="text-sm font-semibold text-[var(--brand-surface-contrast)]">
+                {brandName}
+              </p>
               {brandSubtitle ? (
                 <p className="text-xs text-[var(--brand-muted)]">{brandSubtitle}</p>
               ) : null}
@@ -102,6 +112,7 @@ export function Navbar({
                 key={link.label}
                 type="button"
                 onClick={link.onSelect}
+                aria-pressed={link.isActive}
                 className={`interactive-button group relative inline-flex items-center gap-2 rounded-lg px-3 py-2 ${
                   link.isActive
                     ? 'bg-[var(--brand-primary)]/90 text-[var(--brand-primary-contrast)] shadow-sm'
@@ -127,64 +138,85 @@ export function Navbar({
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <div className="relative" ref={menuRef}>
-            <motion.button
+          {user ? (
+            <div className="relative" ref={menuRef}>
+              <motion.button
+                type="button"
+                onClick={() => setAvatarMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-full border border-transparent bg-white/10 px-2 py-1 text-[var(--brand-surface-contrast)] transition hover:border-white/20 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]"
+                whileTap={{ scale: 0.97 }}
+              >
+                <UserCircle className="h-8 w-8" />
+                <div className="hidden text-left text-xs leading-tight sm:block">
+                  <p className="font-medium">{user.email}</p>
+                  <p className="capitalize text-[var(--brand-muted)]">{user.role}</p>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${avatarMenuOpen ? 'rotate-180' : 'rotate-0'}`}
+                />
+              </motion.button>
+              <AnimatePresence>
+                {avatarMenuOpen ? (
+                  <motion.div
+                    className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-lg border border-black/10 bg-[var(--brand-surface)]/95 shadow-2xl backdrop-blur"
+                    initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+                  >
+                    <div className="border-b border-[var(--brand-border)] px-4 py-3 text-sm">
+                      <p className="font-semibold text-[var(--brand-surface-contrast)]">
+                        {user.email}
+                      </p>
+                      <p className="text-xs capitalize text-[var(--brand-muted)]">{user.role}</p>
+                    </div>
+                    <ul className="space-y-1 p-2 text-sm text-[var(--brand-surface-contrast)]">
+                      <li>
+                        <button className="nav-item-button" type="button">
+                          <User className="h-4 w-4" />
+                          Profile
+                        </button>
+                      </li>
+                      <li>
+                        <button className="nav-item-button" type="button">
+                          <Settings className="h-4 w-4" />
+                          Settings
+                        </button>
+                      </li>
+                    </ul>
+                    <div className="border-t border-[var(--brand-border)] p-2">
+                      <button
+                        className="nav-item-button text-red-300 hover:text-red-200"
+                        type="button"
+                        onClick={() => {
+                          setAvatarMenuOpen(false);
+                          onLogout();
+                        }}
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <button
               type="button"
-              onClick={() => setAvatarMenuOpen((prev) => !prev)}
-              className="flex items-center gap-2 rounded-full border border-transparent bg-white/10 px-2 py-1 text-[var(--brand-surface-contrast)] transition hover:border-white/20 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]"
-              whileTap={{ scale: 0.97 }}
+              onClick={onShowAuthPanel}
+              className="interactive-button inline-flex items-center rounded-md border border-transparent bg-[var(--brand-primary)]/90 px-4 py-2 text-sm font-medium text-[var(--brand-primary-contrast)] hover:bg-[var(--brand-primary)]"
             >
-              <UserCircle className="h-8 w-8" />
-              <div className="hidden text-left text-xs leading-tight sm:block">
-                <p className="font-medium">Sola Abiola</p>
-                <p className="text-[var(--brand-muted)]">Superadmin</p>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${avatarMenuOpen ? 'rotate-180' : 'rotate-0'}`}
-              />
-            </motion.button>
-            <AnimatePresence>
-              {avatarMenuOpen ? (
-                <motion.div
-                  className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-lg border border-black/10 bg-[var(--brand-surface)]/95 shadow-2xl backdrop-blur"
-                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                  transition={{ type: 'spring', stiffness: 200, damping: 18 }}
-                >
-                  <div className="border-b border-[var(--brand-border)] px-4 py-3 text-sm">
-                    <p className="font-semibold text-[var(--brand-surface-contrast)]">Sola Abiola</p>
-                    <p className="text-xs text-[var(--brand-muted)]">superadmin@saas-school.test</p>
-                  </div>
-                  <ul className="space-y-1 p-2 text-sm text-[var(--brand-surface-contrast)]">
-                    <li>
-                      <button className="nav-item-button" type="button">
-                        <User className="h-4 w-4" />
-                        Profile
-                      </button>
-                    </li>
-                    <li>
-                      <button className="nav-item-button" type="button">
-                        <Settings className="h-4 w-4" />
-                        Settings
-                      </button>
-                    </li>
-                  </ul>
-                  <div className="border-t border-[var(--brand-border)] p-2">
-                    <button className="nav-item-button text-red-300 hover:text-red-200" type="button">
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
+              Sign in
+            </button>
+          )}
         </div>
       </div>
     </motion.header>
   );
 }
 
-export default Navbar;
+export const Navbar = React.memo(NavbarComponent);
+Navbar.displayName = 'Navbar';
 
+export default Navbar;

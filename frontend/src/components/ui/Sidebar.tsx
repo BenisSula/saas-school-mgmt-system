@@ -22,7 +22,7 @@ const navItemVariants = {
   visible: { opacity: 1, x: 0 }
 };
 
-export function Sidebar({
+function SidebarComponent({
   links,
   open,
   onClose,
@@ -54,7 +54,11 @@ export function Sidebar({
               className="interactive-button inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--brand-surface-contrast)]"
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+              {collapsed ? (
+                <ChevronsRight className="h-4 w-4" />
+              ) : (
+                <ChevronsLeft className="h-4 w-4" />
+              )}
             </button>
           ) : (
             <button
@@ -71,12 +75,14 @@ export function Sidebar({
         <nav
           className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-4 text-sm text-[var(--brand-surface-contrast)] lg:px-3"
           role="navigation"
+          aria-label="Sidebar navigation"
         >
           <AnimatePresence initial={false}>
             {links.map((link) => (
               <motion.button
                 key={link.label}
                 type="button"
+                aria-pressed={link.isActive}
                 onClick={() => {
                   link.onSelect();
                   if (!isDesktop) {
@@ -121,5 +127,7 @@ export function Sidebar({
   );
 }
 
-export default Sidebar;
+export const Sidebar = React.memo(SidebarComponent);
+Sidebar.displayName = 'Sidebar';
 
+export default Sidebar;
