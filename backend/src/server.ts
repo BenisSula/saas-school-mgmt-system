@@ -1,5 +1,6 @@
 import app from './app';
 import { getPool } from './db/connection';
+import { runMigrations } from './db/runMigrations';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
@@ -7,6 +8,7 @@ async function startServer(): Promise<void> {
   const pool = getPool();
 
   try {
+    await runMigrations(pool);
     await pool.query('SELECT 1');
     app.listen(PORT, () => {
       console.log(`Backend server listening on port ${PORT}`);
