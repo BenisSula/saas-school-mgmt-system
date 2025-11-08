@@ -8,6 +8,8 @@ import React, {
 } from 'react';
 import { api, type BrandingConfig } from '../../lib/api';
 
+export type ThemeMode = 'light' | 'dark';
+
 export interface BrandTokens {
   primary: string;
   primaryContrast: string;
@@ -23,10 +25,33 @@ export interface BrandTokens {
 
 interface BrandContextValue {
   tokens: BrandTokens;
+  theme: ThemeMode;
+  setTheme: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
 }
+
+const THEME_STORAGE_KEY = 'saas-theme-preference';
+
+const DEFAULT_SURFACE_TOKENS: Record<
+  ThemeMode,
+  Pick<BrandTokens, 'surface' | 'surfaceContrast' | 'border' | 'muted'>
+> = {
+  light: {
+    surface: '#f8fafc',
+    surfaceContrast: '#0f172a',
+    border: '#cbd5f5',
+    muted: '#475569'
+  },
+  dark: {
+    surface: '#0f172a',
+    surfaceContrast: '#f1f5f9',
+    border: '#1f2937',
+    muted: '#64748b'
+  }
+};
 
 const DEFAULT_TOKENS: BrandTokens = {
   primary: '#1d4ed8',
@@ -35,14 +60,14 @@ const DEFAULT_TOKENS: BrandTokens = {
   secondaryContrast: '#e2e8f0',
   accent: '#22d3ee',
   accentContrast: '#0f172a',
-  surface: '#0f172a',
-  surfaceContrast: '#f1f5f9',
-  border: '#1f2937',
-  muted: '#64748b'
+  ...DEFAULT_SURFACE_TOKENS.dark
 };
 
 const BrandContext = createContext<BrandContextValue>({
   tokens: DEFAULT_TOKENS,
+  theme: 'dark',
+  setTheme: () => {},
+  toggleTheme: () => {},
   loading: false,
   error: null,
   refresh: async () => {}
@@ -82,13 +107,10 @@ function contrastColor(hex: string): string {
   return luminance(hex) > 0.55 ? '#0f172a' : '#ffffff';
 }
 
-function deriveTokens(branding?: BrandingConfig | null): BrandTokens {
-  if (!branding) {
-    return DEFAULT_TOKENS;
-  }
-
-  const primary = normalizeHex(branding.primary_color, DEFAULT_TOKENS.primary);
-  const secondary = normalizeHex(branding.secondary_color, DEFAULT_TOKENS.secondary);
+function deriveTokens(branding: BrandingConfig | null, theme: ThemeMode): BrandTokens {
+  const surfaceTokens = DEFAULT_SURFACE_TOKENS[theme];
+  const primary = normalizeHex(branding?.primary_color, DEFAULT_TOKENS.primary);
+  const secondary = normalizeHex(branding?.secondary_color, DEFAULT_TOKENS.secondary);
 
   const primaryContrast = contrastColor(primary);
   const secondaryContrast = contrastColor(secondary);
@@ -100,10 +122,7 @@ function deriveTokens(branding?: BrandingConfig | null): BrandTokens {
     secondaryContrast,
     accent: '#22d3ee',
     accentContrast: contrastColor('#22d3ee'),
-    surface: '#0f172a',
-    surfaceContrast: '#f1f5f9',
-    border: '#1f2937',
-    muted: '#64748b'
+    ...surfaceTokens
   };
 }
 
@@ -124,8 +143,34 @@ function applyCssVariables(tokens: BrandTokens) {
   entries.forEach(([key, value]) => root.style.setProperty(key, value));
 }
 
+function applyTheme(theme: ThemeMode) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.dataset.theme = theme;
+  root.style.setProperty('color-scheme', theme);
+  if (theme === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+}
+
+function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'dark';
+  }
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark') {
+    return stored;
+  }
+  const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true;
+  return prefersDark ? 'dark' : 'light';
+}
+
 export function BrandProvider({ children }: { children: React.ReactNode }) {
-  const [tokens, setTokens] = useState<BrandTokens>(DEFAULT_TOKENS);
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+  const [branding, setBranding] = useState<BrandingConfig | null>(null);
+  const [tokens, setTokens] = useState<BrandTokens>(() => deriveTokens(null, getInitialTheme()));
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,15 +178,17 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const branding = await api.getBranding();
-      setTokens(deriveTokens(branding));
+      const brandingResponse = await api.getBranding();
+      setBranding(brandingResponse);
+      setTokens(deriveTokens(brandingResponse, theme));
     } catch (err) {
+      setBranding(null);
       setError((err as Error).message);
-      setTokens(DEFAULT_TOKENS);
+      setTokens(deriveTokens(null, theme));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,27 +197,50 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         await fetchBranding();
       } catch {
         if (!cancelled) {
-          setTokens(DEFAULT_TOKENS);
+          setTokens(deriveTokens(null, theme));
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [fetchBranding]);
+  }, [fetchBranding, theme]);
+
+  useEffect(() => {
+    const nextTokens = deriveTokens(branding, theme);
+    setTokens(nextTokens);
+  }, [branding, theme]);
 
   useEffect(() => {
     applyCssVariables(tokens);
   }, [tokens]);
 
+  useEffect(() => {
+    applyTheme(theme);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    }
+  }, [theme]);
+
+  const handleSetTheme = useCallback((mode: ThemeMode) => {
+    setTheme(mode);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
   const value = useMemo<BrandContextValue>(
     () => ({
       tokens,
+      theme,
+      setTheme: handleSetTheme,
+      toggleTheme,
       loading,
       error,
       refresh: fetchBranding
     }),
-    [tokens, loading, error, fetchBranding]
+    [tokens, theme, handleSetTheme, toggleTheme, loading, error, fetchBranding]
   );
 
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
@@ -179,5 +249,4 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 export function useBrand(): BrandContextValue {
   return useContext(BrandContext);
 }
-
 
