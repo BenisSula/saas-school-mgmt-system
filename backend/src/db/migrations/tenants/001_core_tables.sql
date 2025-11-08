@@ -132,7 +132,8 @@ CREATE TABLE IF NOT EXISTS {{schema}}.classes (
   description TEXT,
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (name)
 );
 
 CREATE TABLE IF NOT EXISTS {{schema}}.grade_scales (

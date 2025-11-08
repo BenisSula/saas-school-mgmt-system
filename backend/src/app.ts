@@ -14,6 +14,7 @@ import invoicesRouter from './routes/invoices';
 import paymentsRouter from './routes/payments';
 import configurationRouter from './routes/configuration';
 import reportsRouter from './routes/reports';
+import usersRouter from './routes/users';
 import { errorHandler } from './middleware/errorHandler';
 import authenticate from './middleware/authenticate';
 import { requirePermission } from './middleware/rbac';
@@ -38,6 +39,7 @@ app.use('/invoices', invoicesRouter);
 app.use('/payments', paymentsRouter);
 app.use('/configuration', configurationRouter);
 app.use('/reports', reportsRouter);
+app.use('/users', usersRouter);
 
 app.get(
   '/admin/overview',

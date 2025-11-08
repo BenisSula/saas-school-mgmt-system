@@ -68,9 +68,15 @@ export async function getFeeOutstanding(
       SELECT
         status,
         COUNT(*)::int AS invoice_count,
-        SUM(total_amount)::float AS total_amount,
-        SUM(amount_paid)::float AS total_paid
-      FROM ${schema}.invoices fi
+        SUM(amount)::float AS total_amount,
+        SUM(COALESCE(paid.total_paid, 0))::float AS total_paid
+      FROM ${schema}.fee_invoices fi
+      LEFT JOIN (
+        SELECT invoice_id, SUM(amount) AS total_paid
+        FROM ${schema}.payments
+        WHERE status = 'succeeded'
+        GROUP BY invoice_id
+      ) AS paid ON paid.invoice_id = fi.id
       WHERE ($1::text IS NULL OR status = $1::text)
       GROUP BY status
       ORDER BY status
