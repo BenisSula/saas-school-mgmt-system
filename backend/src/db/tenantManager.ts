@@ -4,7 +4,7 @@ import path from 'path';
 import { getPool } from './connection';
 import crypto from 'crypto';
 
-function assertValidSchemaName(schemaName: string): void {
+export function assertValidSchemaName(schemaName: string): void {
   if (!/^[a-zA-Z0-9_]+$/.test(schemaName)) {
     throw new Error('Invalid schema name');
   }
@@ -56,11 +56,17 @@ export async function runTenantMigrations(pool: Pool, schemaName: string): Promi
   try {
     assertValidSchemaName(schemaName);
     await client.query(`SET search_path TO ${schemaName}, public`);
-
     for (const file of files) {
       const sql = await fs.promises.readFile(path.join(migrationsDir, file), 'utf-8');
       const renderedSql = sql.replace(/{{schema}}/g, schemaName);
-      await client.query(renderedSql);
+      const statements = renderedSql
+        .split(/;\s*\n/)
+        .map((statement) => statement.trim())
+        .filter(Boolean);
+
+      for (const statement of statements) {
+        await client.query(statement);
+      }
     }
   } finally {
     await client.query('SET search_path TO public');
@@ -72,16 +78,27 @@ export async function seedTenant(pool: Pool, schemaName: string): Promise<void> 
   const client = await pool.connect();
   try {
     assertValidSchemaName(schemaName);
-    await client.query(`SET search_path TO ${schemaName}, public`);
     await client.query(
       `
-        INSERT INTO branding_settings (id, logo_url, primary_color, secondary_color, theme_flags)
+        INSERT INTO ${schemaName}.branding_settings (id, logo_url, primary_color, secondary_color, theme_flags)
         VALUES (uuid_generate_v4(), NULL, '#1d4ed8', '#0f172a', '{}'::jsonb)
         ON CONFLICT (id) DO NOTHING
       `
     );
+    await client.query(
+      `
+        INSERT INTO ${schemaName}.grade_scales (id, min_score, max_score, grade, remark)
+        VALUES
+          (uuid_generate_v4(), 90, 100, 'A+', 'Outstanding'),
+          (uuid_generate_v4(), 80, 89.99, 'A', 'Excellent'),
+          (uuid_generate_v4(), 70, 79.99, 'B', 'Very Good'),
+          (uuid_generate_v4(), 60, 69.99, 'C', 'Good'),
+          (uuid_generate_v4(), 50, 59.99, 'D', 'Satisfactory'),
+          (uuid_generate_v4(), 0, 49.99, 'F', 'Needs Improvement')
+        ON CONFLICT (grade) DO NOTHING
+      `
+    );
   } finally {
-    await client.query('SET search_path TO public');
     client.release();
   }
 }

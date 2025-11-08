@@ -108,6 +108,56 @@ paths:
         '200':
           description: Branding updated
   /school:
+  /attendance/mark:
+    post:
+      summary: Bulk mark attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                records:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AttendanceMark'
+      responses:
+        '204':
+          description: Attendance recorded
+  /attendance/{studentId}:
+    get:
+      summary: Get student attendance history
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Attendance history
+  /attendance/report/class:
+    get:
+      summary: Class attendance report for date
+      parameters:
+        - name: class_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report per status
     get:
       summary: Get school profile
       responses:
@@ -124,6 +174,86 @@ paths:
       responses:
         '200':
           description: School updated
+  /exams:
+    post:
+      summary: Create an exam for the tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamInput'
+      responses:
+        '201':
+          description: Exam created
+  /exams/{examId}/sessions:
+    post:
+      summary: Create or update an exam session
+      parameters:
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamSessionInput'
+      responses:
+        '201':
+          description: Session saved
+  /grades/bulk:
+    post:
+      summary: Bulk grade entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GradeBulkRequest'
+      responses:
+        '200':
+          description: Grades stored
+  /results/{studentId}:
+    get:
+      summary: Get exam results for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: exam_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Result payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamResult'
+  /results/{examId}/export:
+    get:
+      summary: Export exam results
+      parameters:
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, pdf]
+      responses:
+        '200':
+          description: Export streamed
 components:
   parameters:
     Id:
@@ -203,4 +333,145 @@ components:
           additionalProperties: true
       required:
         - name
+    AttendanceMark:
+      type: object
+      properties:
+        studentId:
+          type: string
+        classId:
+          type: string
+        status:
+          type: string
+          enum: [present, absent, late]
+        markedBy:
+          type: string
+        date:
+          type: string
+          format: date
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - studentId
+        - status
+        - markedBy
+        - date
+    ExamInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        examDate:
+          type: string
+          format: date
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+    ExamSessionInput:
+      type: object
+      properties:
+        classId:
+          type: string
+        subject:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        invigilator:
+          type: string
+      required:
+        - classId
+        - subject
+        - scheduledAt
+    GradeEntry:
+      type: object
+      properties:
+        studentId:
+          type: string
+        subject:
+          type: string
+        score:
+          type: number
+        remarks:
+          type: string
+        classId:
+          type: string
+      required:
+        - studentId
+        - subject
+        - score
+    GradeBulkRequest:
+      type: object
+      properties:
+        examId:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradeEntry'
+      required:
+        - examId
+        - entries
+    ExamResult:
+      type: object
+      properties:
+        exam:
+          type: object
+          additionalProperties: true
+        summary:
+          type: object
+          properties:
+            studentId:
+              type: string
+            total:
+              type: number
+            average:
+              type: number
+            percentage:
+              type: number
+            grade:
+              type: string
+            position:
+              type: integer
+        subjects:
+          type: array
+          items:
+            type: object
+            properties:
+              subject:
+                type: string
+              score:
+                type: number
+              grade:
+                type: string
+              remarks:
+                type: string
+        aggregates:
+          type: object
+          properties:
+            highest:
+              type: number
+            lowest:
+              type: number
+            classAverage:
+              type: number
+        leaderboard:
+          type: array
+          items:
+            type: object
+            properties:
+              studentId:
+                type: string
+              total:
+                type: number
+              average:
+                type: number
+              grade:
+                type: string
+              position:
+                type: integer
 

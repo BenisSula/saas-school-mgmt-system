@@ -6,6 +6,10 @@ import studentsRouter from './routes/students';
 import teachersRouter from './routes/teachers';
 import brandingRouter from './routes/branding';
 import schoolRouter from './routes/school';
+import attendanceRouter from './routes/attendance';
+import examsRouter from './routes/exams';
+import gradesRouter from './routes/grades';
+import resultsRouter from './routes/results';
 import { errorHandler } from './middleware/errorHandler';
 import authenticate from './middleware/authenticate';
 import { requirePermission } from './middleware/rbac';
@@ -22,6 +26,10 @@ app.use('/students', studentsRouter);
 app.use('/teachers', teachersRouter);
 app.use('/branding', brandingRouter);
 app.use('/school', schoolRouter);
+app.use('/attendance', attendanceRouter);
+app.use('/exams', examsRouter);
+app.use('/grades', gradesRouter);
+app.use('/results', resultsRouter);
 
 app.get(
   '/admin/overview',
