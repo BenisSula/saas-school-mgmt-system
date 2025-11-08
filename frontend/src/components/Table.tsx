@@ -26,8 +26,11 @@ export function Table<T>({ columns, data, emptyMessage = 'No records found.' }: 
       <table className="min-w-full divide-y divide-slate-800 text-left text-sm text-slate-200">
         <thead className="bg-slate-900">
           <tr>
-            {columns.map((column) => (
-              <th key={column.key.toString()} className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-400">
+            {columns.map((column, columnIndex) => (
+              <th
+                key={column.key ? String(column.key) : `header-${columnIndex}`}
+                className="px-4 py-3 font-semibold uppercase tracking-wide text-xs text-slate-400"
+              >
                 {column.header}
               </th>
             ))}

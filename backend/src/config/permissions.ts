@@ -6,12 +6,16 @@ export type Permission =
   | 'attendance:view'
   | 'exams:manage'
   | 'exams:view'
+  | 'grades:manage'
   | 'fees:manage'
   | 'fees:view'
   | 'users:invite'
   | 'users:manage'
   | 'tenants:manage'
-  | 'settings:branding';
+  | 'settings:branding'
+  | 'students:manage'
+  | 'teachers:manage'
+  | 'school:manage';
 
 export const rolePermissions: Record<Role, Permission[]> = {
   student: ['dashboard:view', 'attendance:view', 'exams:view', 'fees:view'],
@@ -19,26 +23,39 @@ export const rolePermissions: Record<Role, Permission[]> = {
     'dashboard:view',
     'attendance:manage',
     'exams:manage',
-    'fees:view'
+    'exams:view',
+    'grades:manage',
+    'fees:view',
+    'students:manage'
   ],
   admin: [
     'dashboard:view',
     'attendance:manage',
     'exams:manage',
+    'exams:view',
+    'grades:manage',
     'fees:manage',
     'users:invite',
     'users:manage',
-    'settings:branding'
+    'settings:branding',
+    'students:manage',
+    'teachers:manage',
+    'school:manage'
   ],
   superadmin: [
     'dashboard:view',
     'attendance:manage',
     'exams:manage',
+    'exams:view',
+    'grades:manage',
     'fees:manage',
     'users:invite',
     'users:manage',
     'tenants:manage',
-    'settings:branding'
+    'settings:branding',
+    'students:manage',
+    'teachers:manage',
+    'school:manage'
   ]
 };
 

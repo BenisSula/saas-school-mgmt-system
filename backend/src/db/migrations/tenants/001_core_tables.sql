@@ -68,3 +68,52 @@ CREATE TABLE IF NOT EXISTS {{schema}}.fee_invoices (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS {{schema}}.exams (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  exam_date DATE,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.exam_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  exam_id UUID NOT NULL REFERENCES {{schema}}.exams(id) ON DELETE CASCADE,
+  class_id TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  invigilator TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (exam_id, class_id, subject)
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.grade_scales (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  min_score NUMERIC(5,2) NOT NULL,
+  max_score NUMERIC(5,2) NOT NULL,
+  grade TEXT NOT NULL,
+  remark TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (grade),
+  CHECK (min_score <= max_score)
+);
+
+CREATE TABLE IF NOT EXISTS {{schema}}.grades (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  student_id UUID NOT NULL REFERENCES {{schema}}.students(id) ON DELETE CASCADE,
+  exam_id UUID NOT NULL REFERENCES {{schema}}.exams(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  score NUMERIC(6,2) NOT NULL CHECK (score >= 0),
+  grade TEXT,
+  remarks TEXT,
+  class_id TEXT,
+  recorded_by UUID,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (student_id, exam_id, subject)
+);
+

@@ -85,6 +85,19 @@ export async function seedTenant(pool: Pool, schemaName: string): Promise<void> 
         ON CONFLICT (id) DO NOTHING
       `
     );
+    await client.query(
+      `
+        INSERT INTO ${schemaName}.grade_scales (id, min_score, max_score, grade, remark)
+        VALUES
+          (uuid_generate_v4(), 90, 100, 'A+', 'Outstanding'),
+          (uuid_generate_v4(), 80, 89.99, 'A', 'Excellent'),
+          (uuid_generate_v4(), 70, 79.99, 'B', 'Very Good'),
+          (uuid_generate_v4(), 60, 69.99, 'C', 'Good'),
+          (uuid_generate_v4(), 50, 59.99, 'D', 'Satisfactory'),
+          (uuid_generate_v4(), 0, 49.99, 'F', 'Needs Improvement')
+        ON CONFLICT (grade) DO NOTHING
+      `
+    );
   } finally {
     client.release();
   }
