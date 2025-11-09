@@ -1,9 +1,13 @@
 const API_BASE_URL = (() => {
-  const url = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL;
-  if (!url) {
-    throw new Error('Missing VITE_API_BASE_URL environment variable');
+  const explicit = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL;
+  if (explicit) {
+    return explicit;
   }
-  return url;
+  if (import.meta.env.DEV) {
+    console.warn('[api] Falling back to default API base URL http://localhost:3001');
+    return 'http://localhost:3001';
+  }
+  throw new Error('Missing VITE_API_BASE_URL environment variable');
 })();
 const DEFAULT_TENANT = import.meta.env.VITE_TENANT_ID ?? 'tenant_alpha';
 
@@ -22,6 +26,7 @@ let onUnauthorized: UnauthorizedHandler | null = null;
 let onRefresh: RefreshHandler | null = null;
 
 export type Role = 'student' | 'teacher' | 'admin' | 'superadmin';
+export type UserStatus = 'pending' | 'active' | 'suspended' | 'rejected';
 
 export interface AuthUser {
   id: string;
@@ -29,6 +34,7 @@ export interface AuthUser {
   role: Role;
   tenantId: string | null;
   isVerified: boolean;
+  status?: UserStatus;
 }
 
 export interface AuthResponse {
@@ -52,6 +58,7 @@ export interface RegisterPayload {
 
 type FetchOptions = Omit<globalThis.RequestInit, 'headers'> & {
   headers?: Record<string, string>;
+  responseType?: 'json' | 'blob';
 };
 
 async function extractError(response: Response): Promise<string> {
@@ -220,10 +227,11 @@ async function performRefresh(): Promise<AuthResponse | null> {
 }
 
 async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = true): Promise<T> {
+  const { responseType = 'json', ...rest } = options;
   const headers: Record<string, string> = {
     'x-tenant-id': tenantId ?? DEFAULT_TENANT,
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...options.headers
+    ...(rest.body ? { 'Content-Type': 'application/json' } : {}),
+    ...rest.headers
   };
 
   if (accessToken && !headers.Authorization) {
@@ -231,7 +239,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
+    ...rest,
     headers
   });
 
@@ -248,6 +256,10 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
 
   if (response.status === 204) {
     return undefined as T;
+  }
+
+  if (responseType === 'blob') {
+    return (await response.blob()) as T;
   }
 
   return (await response.json()) as T;
@@ -306,6 +318,7 @@ export interface TenantUser {
   role: Role;
   is_verified: boolean;
   created_at: string;
+  status?: UserStatus;
 }
 
 export interface AttendanceHistoryItem {
@@ -373,6 +386,287 @@ export interface Invoice {
   status: string;
   description?: string | null;
   currency?: string | null;
+  created_at?: string;
+}
+
+export interface TeacherProfile {
+  id: string;
+  name: string;
+  email: string;
+  subjects: string[];
+  assigned_classes: string[];
+}
+
+export interface StudentRecord {
+  id: string;
+  first_name: string;
+  last_name: string;
+  class_id: string | null;
+  admission_number: string | null;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  code: string | null;
+  description: string | null;
+}
+
+export interface ClassSubject {
+  class_id: string;
+  subject_id: string;
+  name: string;
+  code: string | null;
+}
+
+export interface AdminTeacherAssignment {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  class_id: string;
+  class_name: string;
+  subject_id: string;
+  subject_name: string;
+  is_class_teacher: boolean;
+}
+
+export interface TeacherAssignmentSummary {
+  assignmentId: string;
+  classId: string;
+  className: string;
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string | null;
+  isClassTeacher: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface StudentSubject {
+  student_id: string;
+  subject_id: string;
+  name: string;
+  code: string | null;
+}
+
+export interface TermReportRequest {
+  studentId: string;
+  termId: string;
+  includeBreakdown?: boolean;
+}
+
+export interface SubjectPayload {
+  name: string;
+  code?: string | null;
+  description?: string | null;
+}
+
+export interface PromoteStudentPayload {
+  toClassId: string;
+  notes?: string;
+}
+
+export interface TeacherOverview {
+  teacher: {
+    id: string;
+    name: string;
+    email: string | null;
+  };
+  summary: {
+    totalClasses: number;
+    totalSubjects: number;
+    classTeacherRoles: number;
+    pendingDropRequests: number;
+  };
+  assignments: TeacherAssignmentSummary[];
+}
+
+export interface TeacherClassSummary {
+  id: string;
+  name: string;
+  isClassTeacher: boolean;
+  subjects: Array<{
+    id: string;
+    name: string;
+    code: string | null;
+    assignmentId: string;
+  }>;
+}
+
+export interface TeacherClassRosterEntry {
+  id: string;
+  first_name: string;
+  last_name: string;
+  admission_number: string | null;
+  parent_contacts: unknown[];
+  class_id: string | null;
+}
+
+export interface TeacherClassReport {
+  class: {
+    id: string;
+    name: string;
+  };
+  studentCount: number;
+  attendance: {
+    present: number;
+    absent: number;
+    late: number;
+    total: number;
+    percentage: number;
+  };
+  grades: Array<{
+    subject: string;
+    entries: number;
+    average: number;
+  }>;
+  fees: {
+    billed: number;
+    paid: number;
+    outstanding: number;
+  };
+  generatedAt: string;
+}
+
+export interface TeacherMessage {
+  id: string;
+  title: string;
+  body: string;
+  classId: string | null;
+  className: string | null;
+  timestamp: string;
+  status: string;
+}
+
+export interface TeacherProfileDetail {
+  id: string;
+  name: string;
+  email: string | null;
+  subjects: string[];
+  classes: Array<{
+    id: string;
+    name: string;
+    subjects: string[];
+    isClassTeacher: boolean;
+  }>;
+}
+
+export interface StudentSubjectSummary {
+  subjectId: string;
+  name: string;
+  code: string | null;
+  dropRequested: boolean;
+  dropStatus: 'pending' | 'approved' | 'rejected' | 'none';
+  dropRequestedAt: string | null;
+}
+
+export interface StudentExamSummary {
+  examId: string;
+  name: string;
+  examDate: string | null;
+  averageScore: number | null;
+  subjectCount: number;
+}
+
+export interface StudentProfileDetail {
+  id: string;
+  firstName: string;
+  lastName: string;
+  classId: string | null;
+  className: string | null;
+  admissionNumber: string | null;
+  parentContacts: unknown[];
+  subjects: StudentSubjectSummary[];
+}
+
+export interface StudentMessage {
+  id: string;
+  title: string;
+  body: string;
+  className: string | null;
+  status: 'unread' | 'read' | 'info';
+  sentAt: string;
+}
+
+export interface StudentTermSummary {
+  id: string;
+  name: string;
+  startsOn: string | null;
+  endsOn: string | null;
+}
+
+export interface StudentTermReportRecord {
+  id: string;
+  termId: string | null;
+  generatedAt: string;
+  summary: unknown;
+}
+
+export interface TopSchool {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  metric_label: string | null;
+  metric_value: number | null;
+  case_study_url?: string | null;
+}
+
+export type SubscriptionTier = 'free' | 'trial' | 'paid';
+export type TenantLifecycleStatus = 'active' | 'suspended' | 'deleted';
+
+export interface PlatformOverview {
+  totals: {
+    schools: number;
+    activeSchools: number;
+    suspendedSchools: number;
+    users: number;
+    pendingUsers: number;
+  };
+  roleDistribution: {
+    admins: number;
+    teachers: number;
+    students: number;
+  };
+  subscriptionBreakdown: Record<SubscriptionTier, number>;
+  revenue: {
+    total: number;
+    byTenant: Array<{ tenantId: string; amount: number }>;
+  };
+  recentSchools: Array<{
+    id: string;
+    name: string;
+    status: TenantLifecycleStatus;
+    subscriptionType: SubscriptionTier;
+    createdAt: string;
+  }>;
+}
+
+export interface PlatformSchool {
+  id: string;
+  name: string;
+  domain: string | null;
+  schemaName: string;
+  status: TenantLifecycleStatus;
+  subscriptionType: SubscriptionTier;
+  billingEmail: string | null;
+  createdAt: string;
+  userCount: number;
+}
+
+export interface CreateSchoolPayload {
+  name: string;
+  domain?: string | null;
+  subscriptionType?: SubscriptionTier;
+  billingEmail?: string | null;
+}
+
+export type UpdateSchoolPayload = Partial<
+  Pick<CreateSchoolPayload, 'name' | 'domain' | 'subscriptionType' | 'billingEmail'>
+> & { status?: TenantLifecycleStatus };
+
+export interface CreateSchoolAdminPayload {
+  email: string;
+  password: string;
+  name?: string | null;
 }
 
 function buildQuery(params: Record<string, string | undefined>): string {
@@ -432,11 +726,29 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
+  updateTerm: (id: string, payload: { name: string; startsOn: string; endsOn: string }) =>
+    apiFetch<AcademicTerm>(`/configuration/terms/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
+  deleteTerm: (id: string) =>
+    apiFetch<void>(`/configuration/terms/${id}`, {
+      method: 'DELETE'
+    }),
   listClasses: () => apiFetch<SchoolClass[]>('/configuration/classes'),
   createClass: (payload: { name: string; description?: string }) =>
     apiFetch<SchoolClass>('/configuration/classes', {
       method: 'POST',
       body: JSON.stringify(payload)
+    }),
+  updateClass: (id: string, payload: { name: string; description?: string }) =>
+    apiFetch<SchoolClass>(`/configuration/classes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
+  deleteClass: (id: string) =>
+    apiFetch<void>(`/configuration/classes/${id}`, {
+      method: 'DELETE'
     }),
 
   // Reports & summaries
@@ -480,11 +792,169 @@ export const api = {
   // Invoices
   getStudentInvoices: (studentId: string) => apiFetch<Invoice[]>(`/invoices/${studentId}`),
 
+  student: {
+    listSubjects: () => apiFetch<StudentSubjectSummary[]>('/student/subjects'),
+    requestSubjectDrop: (subjectId: string, reason?: string) =>
+      apiFetch<{ status: 'pending' | 'approved' | 'rejected' | 'none' }>(
+        `/student/subjects/${subjectId}/drop`,
+        {
+          method: 'POST',
+          body: JSON.stringify(reason ? { reason } : {}),
+          headers: { 'Content-Type': 'application/json' }
+        }
+      ),
+    listExamSummaries: () => apiFetch<StudentExamSummary[]>('/student/results/exams'),
+    getLatestExamId: () => apiFetch<{ examId: string | null }>('/student/results/latest-exam-id'),
+    getProfile: () => apiFetch<StudentProfileDetail>('/student/profile'),
+    updateProfile: (payload: {
+      firstName?: string;
+      lastName?: string;
+      parentContacts?: unknown[];
+    }) =>
+      apiFetch<StudentProfileDetail>('/student/profile', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' }
+      }),
+    requestPromotion: (payload: { targetClassId: string; notes?: string }) =>
+      apiFetch<{ status: 'pending' }>('/student/promotion-requests', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' }
+      }),
+    listMessages: () => apiFetch<StudentMessage[]>('/student/messages'),
+    listTerms: () => apiFetch<StudentTermSummary[]>('/student/terms'),
+    listReports: () => apiFetch<StudentTermReportRecord[]>('/student/reports'),
+    generateTermReport: (termId: string) =>
+      apiFetch<{ reportId: string }>('/student/reports', {
+        method: 'POST',
+        body: JSON.stringify({ termId }),
+        headers: { 'Content-Type': 'application/json' }
+      }),
+    downloadTermReport: (reportId: string) =>
+      apiFetch<Blob>(`/student/reports/${reportId}/pdf`, {
+        responseType: 'blob'
+      })
+  },
+
   // RBAC
   listUsers: () => apiFetch<TenantUser[]>('/users'),
+  listTeachers: () => apiFetch<TeacherProfile[]>('/teachers'),
+  listStudents: () => apiFetch<StudentRecord[]>('/students'),
   updateUserRole: (userId: string, role: Role) =>
     apiFetch<TenantUser>(`/users/${userId}/role`, {
       method: 'PATCH',
       body: JSON.stringify({ role })
-    })
+    }),
+  listPendingUsers: () => apiFetch<TenantUser[]>('/users?status=pending'),
+  approveUser: (userId: string) =>
+    apiFetch<TenantUser>(`/users/${userId}/approve`, {
+      method: 'PATCH'
+    }),
+  rejectUser: (userId: string, reason?: string) =>
+    apiFetch<TenantUser>(`/users/${userId}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason })
+    }),
+  getTopSchools: (limit = 5) => apiFetch<TopSchool[]>(`/schools/top?limit=${limit}`),
+  superuser: {
+    getOverview: () => apiFetch<PlatformOverview>('/superuser/overview'),
+    listSchools: () => apiFetch<PlatformSchool[]>('/superuser/schools'),
+    createSchool: (payload: CreateSchoolPayload) =>
+      apiFetch<{ id: string; schemaName: string }>('/superuser/schools', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }),
+    updateSchool: (id: string, payload: UpdateSchoolPayload) =>
+      apiFetch<PlatformSchool>(`/superuser/schools/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      }),
+    deleteSchool: (id: string) =>
+      apiFetch<void>(`/superuser/schools/${id}`, {
+        method: 'DELETE'
+      }),
+    createSchoolAdmin: (id: string, payload: CreateSchoolAdminPayload) =>
+      apiFetch(`/superuser/schools/${id}/admins`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
+  },
+  admin: {
+    listSubjects: () => apiFetch<Subject[]>('/admin/subjects'),
+    createSubject: (payload: SubjectPayload) =>
+      apiFetch<Subject>('/admin/subjects', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }),
+    updateSubject: (id: string, payload: SubjectPayload) =>
+      apiFetch<Subject>(`/admin/subjects/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      }),
+    deleteSubject: (id: string) =>
+      apiFetch<void>(`/admin/subjects/${id}`, {
+        method: 'DELETE'
+      }),
+    getClassSubjects: (classId: string) =>
+      apiFetch<ClassSubject[]>(`/admin/classes/${classId}/subjects`),
+    setClassSubjects: (classId: string, subjectIds: string[]) =>
+      apiFetch<ClassSubject[]>(`/admin/classes/${classId}/subjects`, {
+        method: 'POST',
+        body: JSON.stringify({ subjectIds })
+      }),
+    listTeacherAssignments: () => apiFetch<AdminTeacherAssignment[]>('/admin/teacher-assignments'),
+    assignTeacher: (
+      teacherId: string,
+      payload: { classId: string; subjectId: string; isClassTeacher?: boolean }
+    ) =>
+      apiFetch<AdminTeacherAssignment>(`/admin/teachers/${teacherId}/assignments`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }),
+    removeTeacherAssignment: (assignmentId: string) =>
+      apiFetch<void>(`/admin/teacher-assignments/${assignmentId}`, {
+        method: 'DELETE'
+      }),
+    getStudentSubjects: (studentId: string) =>
+      apiFetch<StudentSubject[]>(`/admin/students/${studentId}/subjects`),
+    setStudentSubjects: (studentId: string, subjectIds: string[]) =>
+      apiFetch<StudentSubject[]>(`/admin/students/${studentId}/subjects`, {
+        method: 'POST',
+        body: JSON.stringify({ subjectIds })
+      }),
+    promoteStudent: (studentId: string, payload: PromoteStudentPayload) =>
+      apiFetch(`/admin/students/${studentId}/promote`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }),
+    exportTermReport: (payload: TermReportRequest) =>
+      apiFetch<Blob>('/admin/reports/term', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        responseType: 'blob'
+      }),
+    fetchReportPdf: (reportId: string) =>
+      apiFetch<Blob>(`/admin/reports/term/${reportId}/pdf`, {
+        responseType: 'blob'
+      })
+  },
+  teacher: {
+    getOverview: () => apiFetch<TeacherOverview>('/teacher/overview'),
+    listClasses: () => apiFetch<TeacherClassSummary[]>('/teacher/classes'),
+    getClassRoster: (classId: string) =>
+      apiFetch<TeacherClassRosterEntry[]>(`/teacher/classes/${classId}/roster`),
+    dropSubject: (assignmentId: string) =>
+      apiFetch<TeacherAssignmentSummary>(`/teacher/assignments/${assignmentId}/drop`, {
+        method: 'POST'
+      }),
+    getClassReport: (classId: string) =>
+      apiFetch<TeacherClassReport>(`/teacher/reports/class/${classId}`),
+    downloadClassReportPdf: (classId: string) =>
+      apiFetch<Blob>(`/teacher/reports/class/${classId}/pdf`, {
+        responseType: 'blob'
+      }),
+    getMessages: () => apiFetch<TeacherMessage[]>('/teacher/messages'),
+    getProfile: () => apiFetch<TeacherProfileDetail>('/teacher/profile')
+  }
 };

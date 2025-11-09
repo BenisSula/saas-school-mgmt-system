@@ -8,7 +8,7 @@ import {
   setAuthHandlers,
   setTenant
 } from '../lib/api';
-import type { AuthResponse, AuthUser, LoginPayload, RegisterPayload } from '../lib/api';
+import type { AuthResponse, AuthUser, LoginPayload, RegisterPayload, UserStatus } from '../lib/api';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -21,6 +21,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const ACTIVE_STATUS: UserStatus = 'active';
+
+function normaliseUser(user: AuthUser): AuthUser {
+  return {
+    ...user,
+    status: user.status ?? ACTIVE_STATUS
+  };
+}
+
+function ensureActive(user: AuthUser): void {
+  if ((user.status ?? ACTIVE_STATUS) !== ACTIVE_STATUS) {
+    const statusLabel = user.status === 'pending' ? 'pending admin approval' : 'inactive';
+    throw new Error(`Account ${statusLabel}.`);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -32,8 +48,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleRefresh = useCallback((auth: AuthResponse) => {
-    setUser(auth.user);
-    setTenant(auth.user.tenantId ?? null);
+    const normalised = normaliseUser(auth.user);
+    try {
+      ensureActive(normalised);
+    } catch (error) {
+      clearSession();
+      setUser(null);
+      toast.error((error as Error).message);
+      return;
+    }
+    setUser(normalised);
+    setTenant(normalised.tenantId ?? null);
   }, []);
 
   useEffect(() => {
@@ -57,7 +82,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const auth = await authApi.refresh();
         if (auth) {
-          setUser(auth.user);
+          const normalised = normaliseUser(auth.user);
+          try {
+            ensureActive(normalised);
+            setUser(normalised);
+            setTenant(normalised.tenantId ?? null);
+          } catch (error) {
+            clearSession();
+            setUser(null);
+            toast.error((error as Error).message);
+          }
         }
       } finally {
         setIsLoading(false);
@@ -69,10 +103,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const auth = await authApi.login(payload);
-      initialiseSession(auth);
-      setTenant(auth.user.tenantId ?? null);
-      setUser(auth.user);
-      return auth;
+      const normalised = normaliseUser(auth.user);
+      ensureActive(normalised);
+      const authWithStatus: AuthResponse = { ...auth, user: normalised };
+      initialiseSession(authWithStatus);
+      setTenant(normalised.tenantId ?? null);
+      setUser(normalised);
+      return authWithStatus;
     } finally {
       setIsLoading(false);
     }
@@ -82,10 +119,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const auth = await authApi.register(payload);
-      initialiseSession(auth);
-      setTenant(auth.user.tenantId ?? null);
-      setUser(auth.user);
-      return auth;
+      const normalised = normaliseUser(auth.user);
+      const authWithStatus: AuthResponse = { ...auth, user: normalised };
+      if ((normalised.status ?? ACTIVE_STATUS) !== ACTIVE_STATUS) {
+        clearSession();
+        setUser(null);
+        return authWithStatus;
+      }
+      initialiseSession(authWithStatus);
+      setTenant(normalised.tenantId ?? null);
+      setUser(normalised);
+      return authWithStatus;
     } finally {
       setIsLoading(false);
     }

@@ -30,10 +30,8 @@ describe('BrandProvider', () => {
     expect(result.current.tokens.primary).toBe('#000000');
     expect(result.current.tokens.secondary).toBe('#ffffff');
     expect(api.getBranding).toHaveBeenCalled();
-    expect(
-      document.documentElement.style.getPropertyValue('--brand-primary').trim()
-    ).toBe('#000000');
+    expect(document.documentElement.style.getPropertyValue('--brand-primary').trim()).toBe(
+      '#000000'
+    );
   });
 });
-
-

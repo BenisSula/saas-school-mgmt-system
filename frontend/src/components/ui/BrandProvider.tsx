@@ -1,11 +1,4 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState
-} from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, type BrandingConfig } from '../../lib/api';
 
 export type ThemeMode = 'light' | 'dark';
@@ -249,4 +242,3 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 export function useBrand(): BrandContextValue {
   return useContext(BrandContext);
 }
-

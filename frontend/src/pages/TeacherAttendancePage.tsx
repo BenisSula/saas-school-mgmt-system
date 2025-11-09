@@ -1,214 +1,257 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DatePicker } from '../components/DatePicker';
-import Table from '../components/Table';
-import type { TableColumn } from '../components/Table';
-import { Button } from '../components/Button';
+import RouteMeta from '../components/layout/RouteMeta';
 import { useAuth } from '../context/AuthContext';
-import { api, type AttendanceMark, type ClassAttendanceSnapshot } from '../lib/api';
-import { sanitizeIdentifier } from '../lib/sanitize';
+import {
+  api,
+  type AttendanceMark,
+  type TeacherClassRosterEntry,
+  type TeacherClassSummary
+} from '../lib/api';
+import { DatePicker } from '../components/ui/DatePicker';
+import { Select } from '../components/ui/Select';
+import { Button } from '../components/ui/Button';
+import { StatusBanner } from '../components/ui/StatusBanner';
 
 type AttendanceStatus = 'present' | 'absent' | 'late';
 
 interface AttendanceRow {
-  id: string;
+  studentId: string;
+  name: string;
   status: AttendanceStatus;
+}
+
+function defaultDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function TeacherAttendancePage() {
   const { user } = useAuth();
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [classId, setClassId] = useState('');
-  const [rows, setRows] = useState<AttendanceRow[]>([{ id: '', status: 'present' }]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const [snapshot, setSnapshot] = useState<ClassAttendanceSnapshot[]>([]);
+  const [classes, setClasses] = useState<TeacherClassSummary[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [date, setDate] = useState<string>(defaultDate);
+  const [rows, setRows] = useState<AttendanceRow[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingRoster, setLoadingRoster] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const columns: TableColumn<AttendanceRow>[] = useMemo(
-    () => [
-      {
-        header: 'Student ID',
-        render: (row, index) => (
-          <input
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/40"
-            placeholder="uuid-1234..."
-            value={row.id}
-            onChange={(event) => {
-              const value = sanitizeIdentifier(event.target.value);
-              setRows((current) =>
-                current.map((entry, entryIndex) =>
-                  entryIndex === index ? { ...entry, id: value } : entry
-                )
-              );
-            }}
-          />
-        )
-      },
-      {
-        header: 'Status',
-        render: (row, index) => (
-          <select
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/40"
-            value={row.status}
-            onChange={(event) => {
-              const value = event.target.value as AttendanceStatus;
-              setRows((current) =>
-                current.map((entry, entryIndex) =>
-                  entryIndex === index ? { ...entry, status: value } : entry
-                )
-              );
-            }}
-          >
-            <option value="present">Present</option>
-            <option value="absent">Absent</option>
-            <option value="late">Late</option>
-          </select>
-        )
-      },
-      {
-        header: '',
-        align: 'right',
-        render: (_row, index) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              setRows((current) => current.filter((_entry, entryIndex) => entryIndex !== index))
-            }
-            disabled={rows.length === 1}
-          >
-            Remove
-          </Button>
-        )
-      }
-    ],
-    [rows.length]
+  const selectedClass = useMemo(
+    () => classes.find((clazz) => clazz.id === selectedClassId) ?? null,
+    [classes, selectedClassId]
   );
+
+  const loadClasses = useCallback(async () => {
+    setLoadingClasses(true);
+    setError(null);
+    try {
+      const summaries = await api.teacher.listClasses();
+      setClasses(summaries);
+      if (summaries.length > 0) {
+        setSelectedClassId((current) => current || summaries[0].id);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoadingClasses(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadClasses();
+  }, [loadClasses]);
+
+  const loadRoster = async () => {
+    if (!selectedClassId) {
+      toast.error('Select a class before loading the roster.');
+      return;
+    }
+    setLoadingRoster(true);
+    setError(null);
+    try {
+      const rosterEntries: TeacherClassRosterEntry[] =
+        await api.teacher.getClassRoster(selectedClassId);
+      const mapped: AttendanceRow[] = rosterEntries.map((student) => ({
+        studentId: student.id,
+        name: `${student.first_name} ${student.last_name}`,
+        status: 'present'
+      }));
+      setRows(mapped);
+      if (mapped.length === 0) {
+        toast.info('No students found for this class.');
+      } else {
+        toast.success('Roster loaded. Update statuses and save attendance.');
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoadingRoster(false);
+    }
+  };
 
   const markAll = (status: AttendanceStatus) => {
     setRows((current) => current.map((entry) => ({ ...entry, status })));
   };
 
-  const handleSubmit = async () => {
-    if (!user) {
-      toast.error('You must be signed in to mark attendance.');
-      return;
-    }
-    if (!classId) {
-      toast.error('Provide a class identifier.');
-      return;
-    }
-    const validRows = rows.filter((row) => row.id);
-    if (validRows.length === 0) {
-      toast.error('Add at least one student record.');
-      return;
-    }
-
-    const payload: AttendanceMark[] = validRows.map((row) => ({
-      studentId: sanitizeIdentifier(row.id),
-      classId: sanitizeIdentifier(classId),
-      status: row.status,
-      markedBy: user.id,
-      date
-    }));
-
-    setIsSaving(true);
-    try {
-      await api.markAttendance(payload);
-      toast.success(`Attendance saved for ${validRows.length} students.`);
-    } catch (error) {
-      toast.error((error as Error).message);
-    } finally {
-      setIsSaving(false);
-    }
+  const updateRowStatus = (studentId: string, status: AttendanceStatus) => {
+    setRows((current) =>
+      current.map((entry) => (entry.studentId === studentId ? { ...entry, status } : entry))
+    );
   };
 
-  const loadSnapshot = async () => {
-    if (!classId) {
-      toast.error('Provide a class identifier first.');
+  const handleSave = async () => {
+    if (!user) {
+      toast.error('Sign in before saving attendance.');
       return;
     }
-    setSnapshotLoading(true);
+    if (!selectedClassId) {
+      toast.error('Select a class before saving.');
+      return;
+    }
+    if (rows.length === 0) {
+      toast.error('Load the roster before attempting to save attendance.');
+      return;
+    }
+
+    const payload: AttendanceMark[] = rows.map((row) => ({
+      studentId: row.studentId,
+      status: row.status,
+      date,
+      markedBy: user.id,
+      classId: selectedClassId
+    }));
+
+    setSaving(true);
     try {
-      const report = await api.getClassAttendanceSnapshot(sanitizeIdentifier(classId), date);
-      setSnapshot(report);
-      toast.success('Loaded class attendance snapshot.');
-    } catch (error) {
-      toast.error((error as Error).message);
+      await api.markAttendance(payload);
+      toast.success('Attendance recorded successfully.');
+    } catch (err) {
+      toast.error((err as Error).message);
     } finally {
-      setSnapshotLoading(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-lg border border-[var(--brand-border)] bg-[var(--brand-surface)]/70 p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-white">Attendance Marking</h1>
-            <p className="text-sm text-slate-300">
-              Provide a class identifier, add student UUIDs, and submit daily attendance. Use
-              snapshots to verify counts.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              className="w-48 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/40"
-              placeholder="Class ID"
-              value={classId}
-              onChange={(event) => setClassId(sanitizeIdentifier(event.target.value))}
-            />
-            <DatePicker value={date} onChange={(event) => setDate(event.target.value)} />
-            <select
-              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/40"
-              onChange={(event) => markAll(event.target.value as AttendanceStatus)}
+    <RouteMeta title="Attendance">
+      <div className="space-y-6">
+        <header className="space-y-2">
+          <h1 className="text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+            Mark attendance
+          </h1>
+          <p className="text-sm text-[var(--brand-muted)]">
+            Load your class roster, update statuses, and submit attendance in a few clicks.
+          </p>
+        </header>
+
+        {error ? <StatusBanner status="error" message={error} /> : null}
+
+        <section className="grid gap-4 md:grid-cols-[minmax(220px,280px)_minmax(220px,280px)_auto]">
+          <Select
+            label="Class"
+            value={selectedClassId}
+            disabled={loadingClasses}
+            onChange={(event) => setSelectedClassId(event.target.value)}
+            options={classes.map((clazz) => ({
+              value: clazz.id,
+              label: clazz.name
+            }))}
+          />
+          <DatePicker
+            label="Attendance date"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+          />
+          <div className="flex items-end gap-2">
+            <Button
+              onClick={() => void loadRoster()}
+              loading={loadingRoster}
+              disabled={!selectedClassId}
             >
-              <option value="">Bulk status</option>
-              <option value="present">Mark all present</option>
-              <option value="absent">Mark all absent</option>
-              <option value="late">Mark all late</option>
-            </select>
-            <Button variant="outline" onClick={loadSnapshot} loading={snapshotLoading}>
-              Load snapshot
+              Load roster
             </Button>
-            <Button onClick={handleSubmit} loading={isSaving}>
-              Save Attendance
+            <Button
+              variant="outline"
+              onClick={() => markAll('present')}
+              disabled={rows.length === 0}
+            >
+              Mark all present
             </Button>
-          </div>
-        </div>
-      </header>
-
-      <Table columns={columns} data={rows} emptyMessage="Add student identifiers to begin." />
-
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          onClick={() => setRows((current) => [...current, { id: '', status: 'present' }])}
-        >
-          Add row
-        </Button>
-        <Button variant="ghost" onClick={() => setRows([{ id: '', status: 'present' }])}>
-          Clear all
-        </Button>
-      </div>
-
-      {snapshot.length > 0 ? (
-        <section className="rounded-lg border border-[var(--brand-border)] bg-[var(--brand-surface)]/70 p-6">
-          <h2 className="text-lg font-semibold text-white">Class snapshot for {date}</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {snapshot.map((entry) => (
-              <div
-                key={entry.status}
-                className="rounded-lg border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-200"
-              >
-                <p className="uppercase tracking-wide text-xs text-slate-400">{entry.status}</p>
-                <p className="mt-2 text-2xl font-semibold text-white">{entry.count}</p>
-              </div>
-            ))}
           </div>
         </section>
-      ) : null}
-    </div>
+
+        {rows.length === 0 ? (
+          <StatusBanner status="info" message="Load a class roster to begin marking attendance." />
+        ) : (
+          <section className="space-y-4 rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+            <header className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
+                  {selectedClass?.name ?? 'Class roster'}
+                </h2>
+                <p className="text-xs text-[var(--brand-muted)]">
+                  Select the attendance status for each student. Use quick actions to update the
+                  whole class.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" onClick={() => markAll('present')}>
+                  All present
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => markAll('absent')}>
+                  All absent
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => markAll('late')}>
+                  All late
+                </Button>
+              </div>
+            </header>
+
+            <div className="overflow-hidden rounded-lg border border-[var(--brand-border)]">
+              <table className="min-w-full divide-y divide-[var(--brand-border)] text-sm">
+                <thead className="bg-black/20 text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Student</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--brand-border)] bg-black/10">
+                  {rows.map((row) => (
+                    <tr key={row.studentId}>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-[var(--brand-surface-contrast)]">
+                          {row.name}
+                        </p>
+                        <p className="text-xs text-[var(--brand-muted)]">{row.studentId}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          className="rounded-md border border-[var(--brand-border)] bg-black/20 px-3 py-2 text-sm text-[var(--brand-surface-contrast)] focus:border-[var(--brand-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]/40"
+                          value={row.status}
+                          onChange={(event) =>
+                            updateRowStatus(row.studentId, event.target.value as AttendanceStatus)
+                          }
+                        >
+                          <option value="present">Present</option>
+                          <option value="absent">Absent</option>
+                          <option value="late">Late</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={() => void handleSave()} loading={saving}>
+                Save attendance
+              </Button>
+            </div>
+          </section>
+        )}
+      </div>
+    </RouteMeta>
   );
 }
 

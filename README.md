@@ -15,13 +15,51 @@ This monorepo powers the SaaS School Management Portal and tracks the incrementa
 
 Frontend structure highlights:
 
-- `src/App.tsx` – role-aware shell with responsive navbar + sidebar.
-- `src/context/AuthContext.tsx` – handles access/refresh tokens, tenant persistence, auto-refresh schedule.
-- `src/lib/api.ts` – typed client with sanitised request helpers and token lifecycle management.
-- `src/components/ui/` – reusable themable primitives (Button, Input, Modal, Table, Navbar, Sidebar, ThemeToggle, BrandProvider).
-- `src/pages/` – dashboards for each persona (admin configuration, reports, RBAC, teacher grades/attendance, student results/fees, landing auth).
+- `src/App.tsx` – role-aware shell with responsive navbar + sidebar, nested routing, and lazy-loaded dashboards.
+- `src/layouts/LandingShell.tsx` / `src/layouts/AdminShell.tsx` – separate marketing vs authenticated experiences with appropriate landmarks (`header`/`main`/`footer`).
+- `src/context/AuthContext.tsx` – handles access/refresh tokens, tenant persistence, auto-refresh schedule, and pending-user gating.
+- `src/lib/api.ts` – typed client with sanitised request helpers, token lifecycle management, and tenant-aware headers.
+- `src/components/ui/` – reusable themable primitives (Button, Input, Modal, Table, Navbar, Sidebar, ThemeToggle, BrandProvider, AvatarDropdown, DashboardSkeleton).
+- `src/lib/roleLinks.tsx` – central mapping of persona → sidebar navigation definition.
+- `src/pages/` – dashboards for each persona (admin configuration, reports, RBAC, teacher grades/attendance, student results/fees) plus auth/landing flows.
 
 ---
+
+## Landing vs Dashboard Shells
+
+- `LandingShell` wraps all marketing routes (`/`, `/auth/*`), exposes hero anchors for About/Features/Pricing sections, and never mounts dashboard UI.
+- `AdminShell` is rendered only after authentication via `ProtectedRoute`. It wires:
+  - `DashboardHeader` – static brand badge, dynamic page title supplied by `DashboardRouteProvider`, theme toggle, avatar dropdown (profile/settings/logout).
+  - `Sidebar` – collapsible, keyboard accessible, remembers collapse state per user (`localStorage`).
+  - `DashboardSkeleton` fallback around lazy-loaded routes.
+  - `RouteMeta` helper so each route sets its header title/description without duplicating navigation.
+- `getSidebarLinksForRole` ensures each persona sees the correct navigation set:
+  - **Admin/Superadmin:** Dashboard, Users, Configuration, Reports, Fees, Exams, Branding.
+  - **Teacher:** Dashboard, Class Roster, Attendance, Grade Entry, Exams.
+  - **Student:** Dashboard, Attendance, Results, Fees.
+
+## Authentication & Admin Approval Flow
+
+- Public visitors hit `/` (marketing) or `/auth/login|register`.
+- `AuthContext`:
+  - hydrates refresh tokens + tenant ID from storage,
+  - refreshes access tokens on a rolling schedule,
+  - blocks login for users whose `status !== 'active'` (pending, suspended, rejected),
+  - shows “Account pending admin approval” toast/banners when applicable.
+- Landing CTA → Login/Register modal sequence is handled through `/auth/*` routes; successful register returns pending status for teachers/students.
+- Admins/Superadmins manage pending accounts inside the **Users** dashboard tab:
+  - `api.listPendingUsers`, `api.approveUser`, `api.rejectUser` drive the workflow.
+  - UI provides approve/reject buttons with optimistic updates and toasts.
+
+### Auth quick start
+
+```tsx
+const { login, register, user, logout } = useAuth();
+
+await login({ email, password });           // only succeeds if status === 'active'
+await register({ email, password, role });  // returns pending+toast for teacher/student
+// Pending users can be viewed and approved under /dashboard/users
+```
 
 ## Theming & BrandProvider
 
@@ -40,25 +78,6 @@ await api.updateBranding({
   theme_flags: { gradients: true }
 });
 await refresh(); // from useBrand()
-```
-
----
-
-## Authentication Flow (Frontend)
-
-- `AuthContext` hydrates from storage (`hydrateFromStorage`) on load, schedules token refresh (`scheduleTokenRefresh`), and clears refresh timers on logout.
-- `authApi.login|register|refresh` lives in `src/lib/api.ts`; responses call `initialiseSession` to persist tokens + tenant ID while validating tenant format.
-- Failures trigger `setAuthHandlers({ onUnauthorized })`, which displays toasts and redirects to the landing page.
-- `ProtectedRoute` wraps role-gated views (admin/teacher/student) and renders a fallback for unauthorised users.
-- Every request automatically adds the sanitised `x-tenant-id` header and a `Bearer` token when authenticated.
-
-Example guard inside a page:
-
-```tsx
-const { user } = useAuth();
-if (!user || user.role !== 'admin') {
-  return <StatusBanner status="error" message="Admins only" />;
-}
 ```
 
 ---
@@ -107,11 +126,25 @@ When adding new endpoints:
 | Start backend | `npm run dev --prefix backend` (port 3001) |
 | Start frontend | `npm run dev --prefix frontend` (port 5173/5175) |
 
+> ℹ️ When the backend boots in `NODE_ENV=development` it now auto-seeds the demo tenant unless `AUTO_SEED_DEMO=false`. You can still run the script manually via `npm run demo:seed --prefix backend` if you prefer explicit control.
+
+### Demo Accounts
+
+After starting the stack you can log in with:
+
+- **SuperUser:** `owner.demo@platform.test` / `OwnerDemo#2025`
+- **Admin:** `admin.demo@academy.test` / `AdminDemo#2025`
+- **Teacher:** `teacher.demo@academy.test` / `TeacherDemo#2025`
+- **Student:** `student.demo@academy.test` / `StudentDemo#2025`
+
+All demo accounts live on the generated tenant and are marked verified, so the dashboards load immediately for UI/UX reviews across roles.
+
 Environment variables of note:
 
 - `VITE_API_BASE_URL` (required) – API origin for the frontend build.
 - `VITE_TENANT_ID` (optional) – default tenant when storage empty.
 - `CORS_ORIGIN` – comma-separated origins backend allows.
+- If you access the Vite dev server from a different host/port (for example `https://localhost:5173` or your LAN IP), add that origin to `CORS_ORIGIN` when starting the backend, or rely on the built-in localhost/127.0.0.1 allowances.
 - JWT secrets, token TTLs, Postgres connection – see `.env.example` for defaults.
 
 ### Docker Compose
@@ -123,25 +156,26 @@ Services: Postgres 16 (`db`), hot-reloading backend, Vite dev server.
 
 ---
 
-## Build & CI/CD Readiness
+## Build, QA & CI/CD Readiness
 
 - Frontend build: `npm run build --prefix frontend` (runs `tsc` + `vite build`). Produces `frontend/dist/` ready for static hosting.
 - Backend build: `npm run build --prefix backend` (compiles to `backend/dist/`).
 - Test suites:
   - Backend: `npm run test --prefix backend` (Jest integration/unit).
-  - Frontend: `npm run test --prefix frontend` (Vitest + Testing Library).
-  - Accessibility smoke: `npm run test:accessibility --prefix frontend` (axe-core).
+  - Frontend: `pnpm test --filter frontend` or `npm run test --prefix frontend` (Vitest + Testing Library + axe smoke).
+  - Accessibility regression: included in Vitest suite (`src/__tests__/accessibility.test.tsx`).
+  - Manual QA: landing anchors, login/register, admin approvals, role dashboards, sidebar collapse (see `docs/accessibility-report.md` / `docs/performance-report.md`).
 - Pre-commit: Husky + lint-staged auto-run after `npm install` at repo root.
-- Example CI stages: install → lint (`npm run lint --prefix ...`) → tests → `npm run build --prefix frontend` → upload static artefact.
+- Suggested CI stages: install → lint (`npm run lint --prefix ...`) → unit/integration tests → accessibility smoke → `npm run build --prefix frontend` → upload static artefact (optionally run Lighthouse in CI if Chrome available).
 
 ---
 
 ## Documentation & Checklists
 
-- `CHANGELOG.md` – running summary of major releases (Phases 0–7).
+- `CHANGELOG.md` – running summary of major releases (Phases 0–7+).
 - `docs/deployment-checklist.md` – go-live checklist (envs, builds, back-ups, observability, smoke tests).
 - `docs/security-tests.md` – commands + results for security-oriented testing.
-- `docs/performance-audit.md` / `docs/accessibility-report.md` – latest Lighthouse + axe findings.
+- `docs/accessibility-report.md` + `docs/performance-report.md` – latest axe/Lighthouse findings and remediation notes.
 
 See `CHANGELOG.md` for historical phase milestones and `docs/deployment-checklist.md` before any production deployment.
 

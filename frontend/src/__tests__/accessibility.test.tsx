@@ -1,6 +1,7 @@
 import { render, cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { axe } from 'vitest-axe';
+import { MemoryRouter } from 'react-router-dom';
 import HomePage from '../pages';
 
 vi.mock('../context/AuthContext', () => ({
@@ -31,7 +32,11 @@ afterAll(() => {
 
 describe('Accessibility smoke suite', () => {
   it('Home page renders without axe-core violations', async () => {
-    const { container } = render(<HomePage mode={null} onModeChange={() => {}} />);
+    const { container } = render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
+    );
     const results = await axe(container, {
       rules: {
         'definition-list': { enabled: false }

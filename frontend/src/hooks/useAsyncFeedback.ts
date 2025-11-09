@@ -45,4 +45,3 @@ export function useAsyncFeedback(initialStatus: FeedbackStatus = 'info'): AsyncF
 }
 
 export default useAsyncFeedback;
-

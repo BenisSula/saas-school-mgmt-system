@@ -1,42 +1,52 @@
-# Accessibility Audit – SaaS School Management Portal
+# Accessibility Report – SaaS School Management Portal (Phase 7)
 
-Date: 2025-11-08  
-Auditor: Automated + manual review (Phase 5)
+**Date:** 2025-11-08  
+**Auditor:** Automated Vitest + manual QA  
+**Scope:** Landing experience, dashboard shells, role-based pages, approval workflow
+
+---
 
 ## Summary
 
-| Area                      | Status | Notes |
-|---------------------------|:------:|-------|
-| Axe automated checks      | ✅     | `pnpm --filter frontend run test:accessibility` |
-| Keyboard navigation       | ✅     | All focusable elements reachable; skip/close buttons return focus appropriately |
-| Color contrast            | ✅     | Verified against WCAG AA using Chrome DevTools (primary/secondary backgrounds) |
-| Landmark structure        | ✅     | Header/nav/main/footer present; sidebar given `aria-label` |
-| Live regions & alerts     | ✅     | `StatusBanner` uses `role="status"` / `aria-live="polite"` |
-| Modal/dialog semantics    | ✅     | Modal retains focus trap and escape handling |
+| Area                          | Status | Notes |
+|-------------------------------|:------:|-------|
+| Axe automated suite (Vitest)  | ✅     | `pnpm test` (includes `src/__tests__/accessibility.test.tsx`) – 0 violations |
+| Keyboard navigation           | ✅     | Header toggle, sidebar collapse, modals, dropdowns, and CTA buttons reachable & actionable |
+| Landmark & heading structure  | ✅     | `header`/`nav`/`main`/`footer` used; `main` labelled via `DashboardRouteProvider` |
+| Focus management on route change | ✅  | `AdminShell` focuses `<main>` (`tabIndex="-1"`) when navigating |
+| Live regions & alerts         | ✅     | `StatusBanner` and toasts announced via `aria-live="polite"` |
+| Forms & auth states           | ✅     | Labels on all inputs; pending-login message surfaced via toast + `StatusBanner` |
+| Color contrast                | ✅     | Brand tokens (default + tenant overrides) meet WCAG AA (manual Chrome DevTools pass) |
 
-## Automated Testing
+---
+
+## Automated Checks
 
 ```bash
 cd frontend
-pnpm install      # one-time to pick up vitest-axe/axe-core
-pnpm test:accessibility
+pnpm test            # runs all Vitest suites incl. axe smoke test
 ```
 
-The suite renders the home page and runs `axe-core`; zero violations are reported.
+- `src/__tests__/accessibility.test.tsx` mounts `HomePage` within `MemoryRouter` and executes `axe`.
+- Integration suites (`sidebar-behavior.test.tsx`, `routing.test.tsx`) ensure header/sidebar roles, focus handling, and aria attributes persist during navigation.
+
+---
 
 ## Manual Checklist
 
-- **Keyboard only:**  
-  - Navbar/menu toggle reachable with <kbd>Tab</kbd>; `aria-expanded` reflects state.  
-  - Sidebar collapse/expand buttons respond to <kbd>Space</kbd>/<kbd>Enter</kbd>.  
-  - Modal and dropdowns trap focus and close on <kbd>Esc</kbd>.  
-- **Pointer + Screen magnifier:** Buttons sized ≥44px, hover/focus states visible.  
-- **Screen reader sanity:** NVDA + Chrome confirmed section titles, banner messages announced.  
-- **Forms:** All inputs have `<label>` or `aria-label`; inline errors use the same `StatusBanner` for announcement.  
-- **Tables:** Column headers expose `scope="col"`; captions describe dataset context.
+- **Landing page anchors:** Header buttons scroll to the respective sections via `scrollIntoView` with smooth behaviour; section `<section role="region" aria-label="...">` verified in DevTools.
+- **Dashboard navigation:**  
+  - Sidebar collapse/expand toggled with <kbd>Enter</kbd>/<kbd>Space</kbd>, `aria-expanded` updates.  
+  - `RouteMeta` sets the header `<h1>`; screen reader announces updates when navigating.
+- **Modals & dropdowns:** Auth forms and avatar menu trap focus; pressing <kbd>Esc</kbd> closes and returns focus to the trigger.
+- **Approval workflow:** Approve/Reject buttons include accessible labels, toasts announce outcomes.
+- **Tables & lists:** `<Table>` component outputs `<caption>` with context, header cells use `scope="col"`.
 
-## Outstanding Items
+---
 
-- None blocking release. Continue to monitor newly introduced components with `axe` during development.
+## Outstanding Items / Follow-ups
 
+- No blocking issues. Continue to run `pnpm test` (includes axe) whenever UI changes land.
+- When E2E tooling is introduced (Playwright/Cypress), add regression covering keyboard traversal of approval buttons.
 
+---

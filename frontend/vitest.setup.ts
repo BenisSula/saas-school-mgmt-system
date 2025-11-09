@@ -5,13 +5,14 @@ import { vi } from 'vitest';
 vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:3001');
 
 vi.mock('./src/context/AuthContext', () => {
-  const mockAuth = {
+  const mockAuthState = {
     user: {
       id: 'test-user',
       email: 'test@example.com',
       role: 'admin',
       tenantId: 'tenant_alpha',
-      isVerified: true
+      isVerified: true,
+      status: 'active' as const
     },
     isAuthenticated: true,
     isLoading: false,
@@ -21,7 +22,8 @@ vi.mock('./src/context/AuthContext', () => {
   };
   return {
     AuthProvider: ({ children }: { children: React.ReactNode }) => children,
-    useAuth: () => mockAuth
+    useAuth: () => mockAuthState,
+    __mockAuthState: mockAuthState
   };
 });
 

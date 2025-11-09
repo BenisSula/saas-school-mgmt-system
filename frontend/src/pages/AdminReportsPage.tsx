@@ -1,6 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { api, type AttendanceAggregate, type FeeAggregate, type GradeAggregate } from '../lib/api';
+import {
+  api,
+  type AcademicTerm,
+  type AttendanceAggregate,
+  type FeeAggregate,
+  type GradeAggregate,
+  type StudentRecord
+} from '../lib/api';
 import { Button } from '../components/ui/Button';
 import { Table } from '../components/ui/Table';
 import { Input } from '../components/ui/Input';
@@ -32,6 +39,11 @@ function AdminReportsPage() {
   const [gradeData, setGradeData] = useState<GradeAggregate[]>([]);
   const [feeData, setFeeData] = useState<FeeAggregate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [terms, setTerms] = useState<AcademicTerm[]>([]);
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [selectedReportStudentId, setSelectedReportStudentId] = useState('');
+  const [selectedReportTermId, setSelectedReportTermId] = useState('');
   const { status, message, setInfo, setSuccess, setError, clear } = useAsyncFeedback();
 
   const attendanceColumns = useMemo(
@@ -64,6 +76,32 @@ function AdminReportsPage() {
     []
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [termsList, studentsList] = await Promise.all([api.listTerms(), api.listStudents()]);
+        if (cancelled) return;
+        setTerms(termsList);
+        setStudents(studentsList);
+        if (termsList.length > 0) {
+          setSelectedReportTermId((current) => current || termsList[0].id);
+        }
+        if (studentsList.length > 0) {
+          setSelectedReportStudentId((current) => current || studentsList[0].id);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          const message = (error as Error).message;
+          setError(message);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setError]);
+
   async function runAttendanceReport() {
     try {
       setLoading(true);
@@ -86,6 +124,39 @@ function AdminReportsPage() {
       toast.error(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function exportTermReport() {
+    if (!selectedReportStudentId || !selectedReportTermId) {
+      setInfo('Select both a student and term to generate a printable report.');
+      return;
+    }
+    try {
+      setReportLoading(true);
+      clear();
+      const blob = await api.admin.exportTermReport({
+        studentId: selectedReportStudentId,
+        termId: selectedReportTermId
+      });
+      const student = students.find((item) => item.id === selectedReportStudentId);
+      const studentName = student
+        ? `${student.first_name} ${student.last_name}`.replace(/\s+/g, '_')
+        : 'student';
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `term-report-${studentName}.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setSuccess('Printable term report generated.');
+      toast.success('Term report downloaded.');
+    } catch (error) {
+      const message = (error as Error).message;
+      setError(message);
+      toast.error(message);
+    } finally {
+      setReportLoading(false);
     }
   }
 
@@ -274,6 +345,46 @@ function AdminReportsPage() {
         </div>
         <div className="mt-4">
           <Table columns={feeColumns} data={feeData} caption="Fee summary" />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-[var(--brand-border)] bg-slate-900/60 p-6 shadow-lg">
+        <header className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Printable term reports</h2>
+            <p className="text-sm text-slate-400">
+              Generate a PDF-ready performance summary for a learner within a chosen academic term.
+            </p>
+          </div>
+        </header>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Select
+            label="Student"
+            value={selectedReportStudentId}
+            onChange={(event) => setSelectedReportStudentId(event.target.value)}
+            options={students.map((student) => ({
+              value: student.id,
+              label: `${student.first_name} ${student.last_name}`
+            }))}
+          />
+          <Select
+            label="Term"
+            value={selectedReportTermId}
+            onChange={(event) => setSelectedReportTermId(event.target.value)}
+            options={terms.map((term) => ({
+              value: term.id,
+              label: term.name
+            }))}
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button
+            onClick={exportTermReport}
+            loading={reportLoading}
+            disabled={!students.length || !terms.length}
+          >
+            Download term report PDF
+          </Button>
         </div>
       </section>
     </div>

@@ -37,6 +37,14 @@ export function ProtectedRoute({
     );
   }
 
+  if ((user.status ?? 'active') !== 'active') {
+    return (
+      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-6 text-sm text-amber-200">
+        Your account is pending admin approval. Please contact your administrator for access.
+      </div>
+    );
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return (
       <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-6 text-sm text-amber-200">

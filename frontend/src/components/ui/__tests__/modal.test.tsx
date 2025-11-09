@@ -48,5 +48,3 @@ describe('Modal', () => {
     expect(cancelButton).toHaveFocus();
   });
 });
-
-

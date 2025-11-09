@@ -1,218 +1,66 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import {
-  BarChart3,
-  CalendarCheck,
-  GraduationCap,
-  Home,
-  LayoutDashboard,
-  LineChart,
-  ShieldCheck,
-  UserCheck,
-  Wallet
-} from 'lucide-react';
-import { Navbar, type NavigationLink } from './components/ui/Navbar';
-import { Sidebar } from './components/ui/Sidebar';
-import { useResponsiveSidebar } from './hooks/useResponsiveSidebar';
+import { Suspense, lazy, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import type { Role } from './lib/api';
+import { LandingShell } from './layouts/LandingShell';
+import { AdminShell } from './layouts/AdminShell';
+import { getDefaultDashboardPath } from './lib/roleLinks';
+import PlaceholderPage from './pages/PlaceholderPage';
+import RouteMeta from './components/layout/RouteMeta';
 
 const HomePage = lazy(() => import('./pages'));
+const LoginPage = lazy(() => import('./pages/auth/Login'));
+const RegisterPage = lazy(() => import('./pages/auth/Register'));
 const AdminConfigurationPage = lazy(() => import('./pages/AdminConfigurationPage'));
 const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'));
 const AdminRoleManagementPage = lazy(() => import('./pages/AdminRoleManagementPage'));
 const TeacherAttendancePage = lazy(() => import('./pages/TeacherAttendancePage'));
-const StudentFeesPage = lazy(() => import('./pages/StudentFeesPage'));
+const StudentFeesPage = lazy(() => import('./pages/student/StudentFeesPage'));
 const TeacherGradeEntryPage = lazy(() => import('./pages/TeacherGradeEntryPage'));
-const StudentAttendancePage = lazy(() => import('./pages/StudentAttendancePage'));
-const StudentResultsPage = lazy(() => import('./pages/StudentResultsPage'));
-
-type ViewKey =
-  | 'home'
-  | 'admin-config'
-  | 'admin-reports'
-  | 'admin-roles'
-  | 'fees'
-  | 'teacher-grades'
-  | 'teacher-attendance'
-  | 'student-results'
-  | 'student-attendance';
+const StudentAttendancePage = lazy(() => import('./pages/student/StudentAttendancePage'));
+const StudentResultsPage = lazy(() => import('./pages/student/StudentResultsPage'));
+const StudentMessagesPage = lazy(() => import('./pages/student/StudentMessagesPage'));
+const StudentProfilePage = lazy(() => import('./pages/student/StudentProfilePage'));
+const StudentReportsPage = lazy(() => import('./pages/student/StudentReportsPage'));
+const AdminExamConfigPage = lazy(() => import('./pages/AdminExamConfigPage'));
+const TeacherDashboardPage = lazy(() => import('./pages/teacher/TeacherDashboardPage'));
+const TeacherClassesPage = lazy(() => import('./pages/teacher/TeacherClassesPage'));
+const TeacherReportsPage = lazy(() => import('./pages/teacher/TeacherReportsPage'));
+const TeacherMessagesPage = lazy(() => import('./pages/teacher/TeacherMessagesPage'));
+const TeacherProfilePage = lazy(() => import('./pages/teacher/TeacherProfilePage'));
+const SuperuserOverviewPage = lazy(() => import('./pages/superuser/SuperuserOverviewPage'));
+const SuperuserManageSchoolsPage = lazy(
+  () => import('./pages/superuser/SuperuserManageSchoolsPage')
+);
+const SuperuserSubscriptionsPage = lazy(
+  () => import('./pages/superuser/SuperuserSubscriptionsPage')
+);
+const SuperuserUsersPage = lazy(() => import('./pages/superuser/SuperuserUsersPage'));
+const SuperuserReportsPage = lazy(() => import('./pages/superuser/SuperuserReportsPage'));
+const SuperuserSettingsPage = lazy(() => import('./pages/superuser/SuperuserSettingsPage'));
+const AdminClassesSubjectsPage = lazy(() => import('./pages/admin/AdminClassesSubjectsPage'));
+const AdminAttendancePage = lazy(() => import('./pages/admin/AdminAttendancePage'));
+const StudentDashboardPage = lazy(() => import('./pages/student/StudentDashboardPage'));
 
 function App() {
-  const [view, setView] = useState<ViewKey>('home');
-  const [authMode, setAuthMode] = useState<'login' | 'register' | null>(null);
-  const { user, logout } = useAuth();
-  const {
-    isOpen,
-    isDesktop,
-    toggleMobile,
-    closeMobile,
-    shouldShowOverlay,
-    collapsed,
-    toggleCollapsed
-  } = useResponsiveSidebar();
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    const adminViews: ViewKey[] = ['admin-config', 'admin-reports', 'admin-roles'];
-    const teacherViews: ViewKey[] = ['teacher-grades', 'teacher-attendance'];
-    const studentViews: ViewKey[] = ['fees', 'student-results', 'student-attendance'];
-    const roleViewMap: Record<Role, ViewKey> = {
-      superadmin: 'admin-config',
-      admin: 'admin-config',
-      teacher: 'teacher-grades',
-      student: 'student-results'
-    };
-    if (!user) {
-      if (view !== 'home') {
-        setView('home');
-      }
+    if (!isAuthenticated && location.pathname.startsWith('/dashboard')) {
+      navigate('/', { replace: true });
       return;
     }
     if (
-      (adminViews.includes(view) && !['admin', 'superadmin'].includes(user.role)) ||
-      (teacherViews.includes(view) && !['teacher', 'admin', 'superadmin'].includes(user.role)) ||
-      (studentViews.includes(view) && !['student', 'admin', 'superadmin'].includes(user.role))
+      isAuthenticated &&
+      (location.pathname === '/' ||
+        location.pathname === '/dashboard' ||
+        location.pathname.startsWith('/auth'))
     ) {
-      setView(roleViewMap[user.role]);
+      navigate(getDefaultDashboardPath(user?.role), { replace: true });
     }
-  }, [user, view]);
-
-  const activePage = useMemo(() => {
-    switch (view) {
-      case 'admin-config':
-        return (
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-            <AdminConfigurationPage />
-          </ProtectedRoute>
-        );
-      case 'admin-reports':
-        return (
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-            <AdminReportsPage />
-          </ProtectedRoute>
-        );
-      case 'admin-roles':
-        return (
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
-            <AdminRoleManagementPage />
-          </ProtectedRoute>
-        );
-      case 'fees':
-        return (
-          <ProtectedRoute allowedRoles={['student', 'admin', 'superadmin']}>
-            <StudentFeesPage />
-          </ProtectedRoute>
-        );
-      case 'teacher-grades':
-        return (
-          <ProtectedRoute allowedRoles={['teacher', 'admin', 'superadmin']}>
-            <TeacherGradeEntryPage />
-          </ProtectedRoute>
-        );
-      case 'teacher-attendance':
-        return (
-          <ProtectedRoute allowedRoles={['teacher', 'admin', 'superadmin']}>
-            <TeacherAttendancePage />
-          </ProtectedRoute>
-        );
-      case 'student-results':
-        return (
-          <ProtectedRoute allowedRoles={['student', 'admin', 'superadmin']}>
-            <StudentResultsPage />
-          </ProtectedRoute>
-        );
-      case 'student-attendance':
-        return (
-          <ProtectedRoute allowedRoles={['student', 'admin', 'superadmin']}>
-            <StudentAttendancePage />
-          </ProtectedRoute>
-        );
-      default:
-        return <HomePage mode={authMode} onModeChange={setAuthMode} />;
-    }
-  }, [view, authMode]);
-
-  const navDefinitions = useMemo(
-    () =>
-      [
-        {
-          key: 'home',
-          label: 'Landing',
-          icon: <Home className="h-5 w-5" />,
-          allowedRoles: undefined
-        },
-        {
-          key: 'admin-config',
-          label: 'Admin configuration',
-          icon: <LayoutDashboard className="h-5 w-5" />,
-          allowedRoles: ['admin', 'superadmin']
-        },
-        {
-          key: 'admin-reports',
-          label: 'Reports',
-          icon: <BarChart3 className="h-5 w-5" />,
-          allowedRoles: ['admin', 'superadmin']
-        },
-        {
-          key: 'admin-roles',
-          label: 'RBAC manager',
-          icon: <ShieldCheck className="h-5 w-5" />,
-          allowedRoles: ['admin', 'superadmin']
-        },
-        {
-          key: 'teacher-grades',
-          label: 'Teacher grade entry',
-          icon: <GraduationCap className="h-5 w-5" />,
-          allowedRoles: ['teacher', 'admin', 'superadmin']
-        },
-        {
-          key: 'teacher-attendance',
-          label: 'Attendance (Teacher)',
-          icon: <UserCheck className="h-5 w-5" />,
-          allowedRoles: ['teacher', 'admin', 'superadmin']
-        },
-        {
-          key: 'student-results',
-          label: 'Student results',
-          icon: <LineChart className="h-5 w-5" />,
-          allowedRoles: ['student', 'admin', 'superadmin']
-        },
-        {
-          key: 'student-attendance',
-          label: 'Attendance (Student)',
-          icon: <CalendarCheck className="h-5 w-5" />,
-          allowedRoles: ['student', 'admin', 'superadmin']
-        },
-        {
-          key: 'fees',
-          label: 'Student fees',
-          icon: <Wallet className="h-5 w-5" />,
-          allowedRoles: ['student', 'admin', 'superadmin']
-        }
-      ] as Array<{ key: ViewKey } & Omit<NavigationLink, 'onSelect' | 'isActive'>>,
-    []
-  );
-
-  const navLinks: NavigationLink[] = useMemo(() => {
-    return navDefinitions
-      .filter((definition) => {
-        if (!definition.allowedRoles) return true;
-        if (!user) return false;
-        return definition.allowedRoles.includes(user.role);
-      })
-      .map((definition) => ({
-        label: definition.label,
-        icon: definition.icon,
-        allowedRoles: definition.allowedRoles,
-        isActive: view === definition.key,
-        onSelect: () => {
-          setAuthMode(null);
-          setView(definition.key);
-        }
-      }));
-  }, [navDefinitions, user, view]);
-
-  const isAdminView = view !== 'home';
+  }, [isAuthenticated, location.pathname, navigate, user?.role]);
 
   return (
     <Suspense
@@ -225,57 +73,366 @@ function App() {
         </div>
       }
     >
-      <div className="min-h-screen bg-[var(--brand-surface, #0f172a)] text-[var(--brand-surface-contrast,#f1f5f9)] transition-colors duration-300">
-        <Navbar
-          brandName="SaaS School Portal"
-          brandSubtitle="Multi-tenant school experience"
-          links={navLinks}
-          onToggleSidebar={toggleMobile}
-          sidebarOpen={isOpen}
-          user={user}
-          onLogout={logout}
-          onShowAuthPanel={() => {
-            setView('home');
-            setAuthMode('login');
-          }}
-        />
-
-        <div className="relative mx-auto flex w-full max-w-[1400px] gap-4 px-2 sm:px-4">
-          <div
-            className={`fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm transition-opacity sm:hidden ${
-              shouldShowOverlay
-                ? 'pointer-events-auto opacity-100'
-                : 'pointer-events-none opacity-0'
-            }`}
-            aria-hidden={!shouldShowOverlay}
-            onClick={closeMobile}
+      <Routes>
+        <Route path="/" element={<LandingShell />}>
+          <Route index element={<HomePage />} />
+          <Route path="auth">
+            <Route path="login" element={<LoginPage />} />
+            <Route path="register" element={<RegisterPage />} />
+          </Route>
+        </Route>
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute
+              fallback={<Navigate to="/" replace />}
+              loadingFallback={
+                <div className="flex min-h-screen items-center justify-center text-sm text-[var(--brand-muted)]">
+                  Checking session…
+                </div>
+              }
+            >
+              <AdminShell user={user ?? null} onLogout={logout}>
+                <Outlet />
+              </AdminShell>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to={getDefaultDashboardPath(user?.role)} replace />} />
+          <Route
+            path="overview"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="Executive dashboard">
+                  <PlaceholderPage
+                    title="Executive dashboard"
+                    description="High-level metrics across tenants, uptime, and operational health."
+                  />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
           />
-          {navLinks.length > 0 && (
-            <Sidebar
-              links={navLinks}
-              open={isOpen}
-              onClose={closeMobile}
-              collapsed={collapsed}
-              onCollapsedToggle={toggleCollapsed}
-              isDesktop={isDesktop}
+          <Route
+            path="users"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="User management">
+                  <AdminRoleManagementPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="classes"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <AdminClassesSubjectsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="attendance"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <AdminAttendancePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="Reports & exports">
+                  <AdminReportsPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="fees"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="Fees">
+                  <StudentFeesPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="examinations"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="Examinations">
+                  <AdminExamConfigPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="School settings">
+                  <AdminConfigurationPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="superuser">
+            <Route
+              path="overview"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserOverviewPage />
+                </ProtectedRoute>
+              }
             />
-          )}
-          <main
-            className={`relative z-10 flex-1 py-6 ${isDesktop ? 'px-6' : 'px-2 sm:px-4'} transition-all duration-300`}
-          >
-            {isAdminView ? <div className="space-y-6">{activePage}</div> : activePage}
-          </main>
-        </div>
-
-        {!isAdminView ? null : (
-          <footer className="border-t border-[var(--brand-border)] bg-[var(--brand-surface)]/80 py-6 text-center text-xs text-[var(--brand-muted)] backdrop-blur">
-            <div className="mx-auto max-w-6xl px-4">
-              Built for responsive multi-tenant schools · Keyboard accessible · Powered by schema
-              isolation
-            </div>
-          </footer>
-        )}
-      </div>
+            <Route
+              path="schools"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserManageSchoolsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="subscriptions"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserSubscriptionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserUsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+          <Route path="teacher">
+            <Route
+              path="dashboard"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <TeacherDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="classes"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <TeacherClassesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="attendance"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <TeacherAttendancePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="grades"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <RouteMeta title="Exams & grades">
+                    <TeacherGradeEntryPage />
+                  </RouteMeta>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <TeacherReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="messages"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <TeacherMessagesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="profile"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <TeacherProfilePage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+          <Route path="student">
+            <Route
+              path="overview"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="attendance"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentAttendancePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="results"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentResultsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="fees"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentFeesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="messages"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentMessagesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="profile"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['student', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <StudentReportsPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Suspense>
   );
 }

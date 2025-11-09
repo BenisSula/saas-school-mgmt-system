@@ -11,14 +11,7 @@ export interface ModalProps {
   initialFocusRef?: React.RefObject<HTMLElement>;
 }
 
-export function Modal({
-  title,
-  isOpen,
-  onClose,
-  children,
-  footer,
-  initialFocusRef
-}: ModalProps) {
+export function Modal({ title, isOpen, onClose, children, footer, initialFocusRef }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const lastActiveElement = useRef<HTMLElement | null>(null);
 
@@ -27,7 +20,11 @@ export function Modal({
       return;
     }
     lastActiveElement.current = document.activeElement as HTMLElement;
-    const node = initialFocusRef?.current ?? dialogRef.current?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const node =
+      initialFocusRef?.current ??
+      dialogRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
     node?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -106,5 +103,3 @@ export function Modal({
 }
 
 export default Modal;
-
-

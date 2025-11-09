@@ -13,13 +13,29 @@ export interface ResponsiveSidebarState {
   toggleCollapsed: () => void;
 }
 
-function readCollapsedPref(): boolean {
+interface UseResponsiveSidebarOptions {
+  initialOpen?: boolean;
+  storageKey?: string;
+}
+
+function readCollapsedPref(key: string): boolean {
   if (typeof window === 'undefined') return false;
-  const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+  const stored = window.localStorage.getItem(key);
   return stored === 'true';
 }
 
-export function useResponsiveSidebar(initialOpen = false): ResponsiveSidebarState {
+function writeCollapsedPref(key: string, value: boolean) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(key, String(value));
+}
+
+export function useResponsiveSidebar(
+  options: UseResponsiveSidebarOptions = {}
+): ResponsiveSidebarState {
+  const { initialOpen = false, storageKey } = options;
+  const collapsedKey = storageKey
+    ? `${SIDEBAR_COLLAPSED_KEY}:${storageKey}`
+    : SIDEBAR_COLLAPSED_KEY;
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') {
       return false;
@@ -27,7 +43,7 @@ export function useResponsiveSidebar(initialOpen = false): ResponsiveSidebarStat
     return window.matchMedia(DESKTOP_QUERY).matches;
   });
   const [menuOpen, setMenuOpen] = useState<boolean>(initialOpen);
-  const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsedPref());
+  const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsedPref(collapsedKey));
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') {
@@ -39,7 +55,7 @@ export function useResponsiveSidebar(initialOpen = false): ResponsiveSidebarStat
       setIsDesktop(desktop);
       if (desktop) {
         setMenuOpen(true);
-        setCollapsed(readCollapsedPref());
+        setCollapsed(readCollapsedPref(collapsedKey));
       } else {
         setMenuOpen(false);
         setCollapsed(false);
@@ -51,7 +67,7 @@ export function useResponsiveSidebar(initialOpen = false): ResponsiveSidebarStat
     const listener = (event: MediaQueryListEvent) => updateFromQuery(event.matches);
     mediaQueryList.addEventListener('change', listener);
     return () => mediaQueryList.removeEventListener('change', listener);
-  }, []);
+  }, [collapsedKey]);
 
   const toggleMobile = useCallback(() => {
     if (isDesktop) return;
@@ -67,12 +83,10 @@ export function useResponsiveSidebar(initialOpen = false): ResponsiveSidebarStat
     if (!isDesktop) return;
     setCollapsed((prev) => {
       const next = !prev;
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
-      }
+      writeCollapsedPref(collapsedKey, next);
       return next;
     });
-  }, [isDesktop]);
+  }, [collapsedKey, isDesktop]);
 
   const isOpen = useMemo(() => (isDesktop ? true : menuOpen), [isDesktop, menuOpen]);
   const shouldShowOverlay = !isDesktop && isOpen;
@@ -89,4 +103,3 @@ export function useResponsiveSidebar(initialOpen = false): ResponsiveSidebarStat
 }
 
 export default useResponsiveSidebar;
-

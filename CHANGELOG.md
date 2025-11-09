@@ -2,11 +2,11 @@
 
 All notable updates to the SaaS School Management System are tracked here.
 
-## Phase 7 – Deployment Readiness & Docs (2025-11-08)
-- Hardened frontend token lifecycle (auto-refresh, logout on refresh failure, tenant ID validation).
-- Sanitised all user inputs before hitting the API using `sanitizeText`/`sanitizeIdentifier`.
-- Added accessibility and performance audits plus deployment checklist and security test report.
-- Updated README with theming, auth, API integration guidance, and CI/CD notes.
+## Phase 7 – QA, Accessibility & Handover (2025-11-08)
+- Finalised landing vs dashboard separation with nested routing, `RouteMeta`, and accessible page titles.
+- Rebuilt dashboard shell: static header + collapsible sidebar with per-role link mapping and persisted collapse state.
+- Extended Vitest integration coverage (`routing.test.tsx`, `sidebar-behavior.test.tsx`) and ensured `pnpm lint`, `pnpm test`, `pnpm build` pass.
+- Produced updated accessibility & performance reports, refreshed README (shells, approval workflow, theming), and documented pending-user approval process.
 
 ## Phase 6 – Security, Scalability & Final Testing (2025-11-08)
 - Enforced env-driven API base URL and cleaned up tenant storage.

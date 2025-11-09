@@ -31,5 +31,3 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-disabled', 'true');
   });
 });
-
-
