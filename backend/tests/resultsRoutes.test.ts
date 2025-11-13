@@ -5,6 +5,7 @@ import request from 'supertest';
 import app from '../src/app';
 import { createTestPool } from './utils/testDb';
 import { getPool } from '../src/db/connection';
+import { computeStudentResult } from '../src/services/examService';
 
 type MockAuthRequest = Request & {
   user?: {
@@ -15,6 +16,8 @@ type MockAuthRequest = Request & {
     tokenId: string;
   };
 };
+
+type StudentResult = Awaited<ReturnType<typeof computeStudentResult>>;
 
 const currentUser: NonNullable<MockAuthRequest['user']> = {
   id: 'admin-user',
@@ -42,16 +45,28 @@ jest.mock('../src/db/connection', () => ({
   closePool: jest.fn()
 }));
 
-const mockedGetPool = getPool as unknown as jest.Mock;
+jest.mock('../src/services/examService', () => {
+  const actual = jest.requireActual('../src/services/examService');
+  return {
+    ...actual,
+    computeStudentResult: jest.fn()
+  };
+});
 
-describe('Attendance routes', () => {
+const mockedGetPool = getPool as unknown as jest.Mock;
+const computeStudentResultMock = computeStudentResult as jest.MockedFunction<
+  typeof computeStudentResult
+>;
+
+describe('Results routes RBAC', () => {
   const headers = { Authorization: 'Bearer fake', 'x-tenant-id': 'tenant_alpha' };
   let pool: Pool;
-  let classId: string;
   let studentAId: string;
   let studentBId: string;
   let tenantId: string;
+  let classId: string;
   let adminUserId: string;
+  const examId = crypto.randomUUID();
 
   beforeAll(async () => {
     const testPool = await createTestPool();
@@ -59,7 +74,6 @@ describe('Attendance routes', () => {
     mockedGetPool.mockReturnValue(pool);
     tenantId = crypto.randomUUID();
     adminUserId = crypto.randomUUID();
-
     await pool.query(
       `
         CREATE TABLE IF NOT EXISTS tenant_alpha.audit_logs (
@@ -75,11 +89,7 @@ describe('Attendance routes', () => {
     );
 
     await pool.query(
-      `
-        INSERT INTO shared.tenants (id, name, schema_name)
-        VALUES ($1, 'Attendance School', 'tenant_alpha')
-        ON CONFLICT (schema_name) DO NOTHING
-      `,
+      "INSERT INTO shared.tenants (id, name, schema_name) VALUES ($1, 'Results School', 'tenant_alpha') ON CONFLICT (schema_name) DO NOTHING",
       [tenantId]
     );
 
@@ -87,63 +97,92 @@ describe('Attendance routes', () => {
     studentAId = crypto.randomUUID();
     studentBId = crypto.randomUUID();
 
-    await pool.query(
-      `
-        INSERT INTO tenant_alpha.classes (id, name, description)
-        VALUES ($1, 'Class A', 'Primary cohort')
-      `,
-      [classId]
-    );
+    await pool.query("INSERT INTO tenant_alpha.classes (id, name) VALUES ($1, 'Grade 9')", [
+      classId
+    ]);
 
     await pool.query(
-      `
-        INSERT INTO tenant_alpha.students (id, first_name, last_name, admission_number, class_id, parent_contacts)
-        VALUES ($1, 'Test', 'Student', 'ADM-001', $3, '[]'::jsonb),
-               ($2, 'Other', 'Student', 'ADM-002', $3, '[]'::jsonb)
-      `,
+      "INSERT INTO tenant_alpha.students (id, first_name, last_name, parent_contacts, class_id) VALUES ($1, 'Alex', 'One', '[]'::jsonb, $3), ($2, 'Maya', 'Two', '[]'::jsonb, $3)",
       [studentAId, studentBId, classId]
-    );
-
-    await pool.query(
-      `
-        INSERT INTO tenant_alpha.attendance_records (student_id, class_id, status, marked_by, attendance_date, metadata)
-        VALUES ($1, $2, 'present', $3, $4, '{}'::jsonb)
-      `,
-      [studentBId, classId, adminUserId, '2025-01-01']
     );
   });
 
   beforeEach(() => {
     Object.assign(currentUser, {
       id: adminUserId,
-      role: 'admin',
+      role: 'admin' as const,
       tenantId,
       email: 'admin@test.com'
     });
+    computeStudentResultMock.mockReset();
   });
 
-  it('forbids a student from accessing another student attendance and logs the attempt', async () => {
+  it('forbids a student from accessing another student exam results and logs the attempt', async () => {
     Object.assign(currentUser, {
       id: studentAId,
       role: 'student' as const,
-      email: 'studentA@example.com',
+      email: 'studentA@test.com',
       tenantId
     });
 
     const before = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM tenant_alpha.audit_logs WHERE action = 'UNAUTHORIZED_ACCESS_ATTEMPT'`
+      "SELECT COUNT(*)::int AS count FROM tenant_alpha.audit_logs WHERE action = 'UNAUTHORIZED_ACCESS_ATTEMPT'"
     );
     const beforeCount = before.rows[0].count as number;
 
-    const res = await request(app).get(`/attendance/${studentBId}`).set(headers);
+    const res = await request(app)
+      .get(`/results/${studentBId}`)
+      .set(headers)
+      .query({ exam_id: examId });
 
     expect(res.status).toBe(403);
+    expect(computeStudentResultMock).not.toHaveBeenCalled();
 
     const after = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM tenant_alpha.audit_logs WHERE action = 'UNAUTHORIZED_ACCESS_ATTEMPT'`
+      "SELECT COUNT(*)::int AS count FROM tenant_alpha.audit_logs WHERE action = 'UNAUTHORIZED_ACCESS_ATTEMPT'"
     );
     const afterCount = after.rows[0].count as number;
 
     expect(afterCount).toBe(beforeCount + 1);
+  });
+
+  it('allows an admin to fetch any student exam results', async () => {
+    Object.assign(currentUser, {
+      id: 'admin-user',
+      role: 'admin' as const,
+      email: 'admin@test.com',
+      tenantId
+    });
+
+    const mockResult: StudentResult = {
+      exam: null,
+      summary: {
+        studentId: studentBId,
+        total: 95,
+        average: 95,
+        percentage: 95,
+        grade: 'A',
+        position: null
+      },
+      subjects: [],
+      aggregates: {
+        highest: 95,
+        lowest: 95,
+        classAverage: 95
+      },
+      leaderboard: []
+    };
+
+    computeStudentResultMock.mockResolvedValue(mockResult);
+
+    const res = await request(app)
+      .get(`/results/${studentBId}`)
+      .set(headers)
+      .query({ exam_id: examId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toEqual(mockResult.summary);
+    expect(res.body.aggregates).toEqual(mockResult.aggregates);
+    expect(computeStudentResultMock).toHaveBeenCalled();
   });
 });

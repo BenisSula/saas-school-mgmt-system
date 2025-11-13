@@ -13,6 +13,9 @@ import {
   requestAssignmentDrop,
   type TeacherRecord
 } from '../services/teacherDashboardService';
+import { logUnauthorizedAttempt } from '../services/auditLogService';
+import { respondTeacherContextMissing, respondTenantContextMissing } from '../lib/friendlyMessages';
+import { requireRoleGuard } from '../middleware/authGuards';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -22,17 +25,26 @@ declare module 'express-serve-static-core' {
 
 const router = Router();
 
-router.use(authenticate, tenantResolver());
+router.use(authenticate, tenantResolver(), requireRoleGuard(['teacher', 'admin', 'superadmin']));
 
 router.use(async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant || !req.user?.email) {
-      return res.status(500).json({ message: 'Teacher context unavailable' });
+      return respondTeacherContextMissing(res);
     }
 
     const teacher = await findTeacherByEmail(req.tenantClient, req.tenant.schema, req.user.email);
     if (!teacher) {
-      return res.status(404).json({ message: 'Teacher profile not found' });
+      await logUnauthorizedAttempt(req.tenantClient, req.tenant?.schema, {
+        userId: req.user?.id ?? null,
+        path: req.originalUrl ?? req.path,
+        method: req.method,
+        reason: 'Teacher profile missing'
+      });
+      return res.status(403).json({
+        message:
+          'Access restricted to teacher accounts. Please contact an administrator for assistance.'
+      });
     }
 
     req.teacherRecord = teacher;
@@ -45,7 +57,7 @@ router.use(async (req, res, next) => {
 router.get('/overview', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -59,7 +71,7 @@ router.get('/overview', async (req, res, next) => {
 router.get('/classes', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -73,7 +85,7 @@ router.get('/classes', async (req, res, next) => {
 router.get('/classes/:classId/roster', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -84,7 +96,16 @@ router.get('/classes/:classId/roster', async (req, res, next) => {
       req.params.classId
     );
     if (!roster) {
-      return res.status(403).json({ message: 'You are not assigned to this class.' });
+      await logUnauthorizedAttempt(req.tenantClient, req.tenant?.schema, {
+        userId: req.user?.id ?? null,
+        path: req.originalUrl ?? req.path,
+        method: req.method,
+        reason: 'Teacher not assigned to class',
+        details: { teacherId: teacher.id, classId: req.params.classId }
+      });
+      return res
+        .status(403)
+        .json({ message: 'You are not assigned to this class. Thank you for your understanding.' });
     }
     res.json(roster);
   } catch (error) {
@@ -95,7 +116,7 @@ router.get('/classes/:classId/roster', async (req, res, next) => {
 router.post('/assignments/:assignmentId/drop', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -117,7 +138,7 @@ router.post('/assignments/:assignmentId/drop', async (req, res, next) => {
 router.get('/reports/class/:classId', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -128,7 +149,16 @@ router.get('/reports/class/:classId', async (req, res, next) => {
       req.params.classId
     );
     if (!report) {
-      return res.status(403).json({ message: 'You are not assigned to this class.' });
+      await logUnauthorizedAttempt(req.tenantClient, req.tenant?.schema, {
+        userId: req.user?.id ?? null,
+        path: req.originalUrl ?? req.path,
+        method: req.method,
+        reason: 'Teacher not assigned to class report',
+        details: { teacherId: teacher.id, classId: req.params.classId }
+      });
+      return res
+        .status(403)
+        .json({ message: 'You are not assigned to this class. Thank you for your understanding.' });
     }
     res.json(report);
   } catch (error) {
@@ -139,7 +169,7 @@ router.get('/reports/class/:classId', async (req, res, next) => {
 router.get('/reports/class/:classId/pdf', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -150,7 +180,16 @@ router.get('/reports/class/:classId/pdf', async (req, res, next) => {
       req.params.classId
     );
     if (!report) {
-      return res.status(403).json({ message: 'You are not assigned to this class.' });
+      await logUnauthorizedAttempt(req.tenantClient, req.tenant?.schema, {
+        userId: req.user?.id ?? null,
+        path: req.originalUrl ?? req.path,
+        method: req.method,
+        reason: 'Teacher not assigned to class report PDF',
+        details: { teacherId: teacher.id, classId: req.params.classId }
+      });
+      return res
+        .status(403)
+        .json({ message: 'You are not assigned to this class. Thank you for your understanding.' });
     }
 
     const pdfBuffer = await createClassReportPdf(report, teacher.name);
@@ -170,7 +209,7 @@ router.get('/reports/class/:classId/pdf', async (req, res, next) => {
 router.get('/messages', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
@@ -184,7 +223,7 @@ router.get('/messages', async (req, res, next) => {
 router.get('/profile', async (req, res, next) => {
   try {
     if (!req.tenantClient || !req.tenant) {
-      return res.status(500).json({ message: 'Tenant context missing' });
+      return respondTenantContextMissing(res);
     }
 
     const teacher = req.teacherRecord!;
