@@ -1,33 +1,49 @@
 import type { PoolClient } from 'pg';
 import { TeacherInput } from '../validators/teacherValidator';
+import { assertValidSchemaName } from '../db/tenantManager';
 
 const table = 'teachers';
 
-export async function listTeachers(client: PoolClient) {
-  const result = await client.query(`SELECT * FROM ${table} ORDER BY created_at DESC`);
+function tableName(schema: string): string {
+  assertValidSchemaName(schema);
+  return `${schema}.${table}`;
+}
+
+export async function listTeachers(client: PoolClient, schema: string) {
+  const result = await client.query(`SELECT * FROM ${tableName(schema)} ORDER BY created_at DESC`);
   return result.rows;
 }
 
-export async function getTeacher(client: PoolClient, id: string) {
-  const result = await client.query(`SELECT * FROM ${table} WHERE id = $1`, [id]);
+export async function getTeacher(client: PoolClient, schema: string, id: string) {
+  const result = await client.query(`SELECT * FROM ${tableName(schema)} WHERE id = $1`, [id]);
   return result.rows[0];
 }
 
-export async function createTeacher(client: PoolClient, payload: TeacherInput) {
+export async function createTeacher(client: PoolClient, schema: string, payload: TeacherInput) {
   const result = await client.query(
     `
-      INSERT INTO ${table} (name, email, subjects, assigned_classes)
+      INSERT INTO ${tableName(schema)} (name, email, subjects, assigned_classes)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `,
-    [payload.name, payload.email, JSON.stringify(payload.subjects ?? []), JSON.stringify(payload.assignedClasses ?? [])]
+    [
+      payload.name,
+      payload.email,
+      JSON.stringify(payload.subjects ?? []),
+      JSON.stringify(payload.assignedClasses ?? [])
+    ]
   );
 
   return result.rows[0];
 }
 
-export async function updateTeacher(client: PoolClient, id: string, payload: Partial<TeacherInput>) {
-  const existing = await getTeacher(client, id);
+export async function updateTeacher(
+  client: PoolClient,
+  schema: string,
+  id: string,
+  payload: Partial<TeacherInput>
+) {
+  const existing = await getTeacher(client, schema, id);
   if (!existing) {
     return null;
   }
@@ -41,7 +57,7 @@ export async function updateTeacher(client: PoolClient, id: string, payload: Par
 
   const result = await client.query(
     `
-      UPDATE ${table}
+      UPDATE ${tableName(schema)}
       SET name = $1,
           email = $2,
           subjects = $3,
@@ -56,7 +72,6 @@ export async function updateTeacher(client: PoolClient, id: string, payload: Par
   return result.rows[0];
 }
 
-export async function deleteTeacher(client: PoolClient, id: string) {
-  await client.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+export async function deleteTeacher(client: PoolClient, schema: string, id: string) {
+  await client.query(`DELETE FROM ${tableName(schema)} WHERE id = $1`, [id]);
 }
-

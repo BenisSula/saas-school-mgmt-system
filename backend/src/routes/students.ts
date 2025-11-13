@@ -16,12 +16,18 @@ const router = Router();
 router.use(authenticate, tenantResolver(), requirePermission('users:manage'));
 
 router.get('/', async (req, res) => {
-  const students = await listStudents(req.tenantClient!);
+  if (!req.tenantClient || !req.tenant) {
+    return res.status(500).json({ message: 'Tenant context missing' });
+  }
+  const students = await listStudents(req.tenantClient!, req.tenant.schema);
   res.json(students);
 });
 
 router.get('/:id', async (req, res) => {
-  const student = await getStudent(req.tenantClient!, req.params.id);
+  if (!req.tenantClient || !req.tenant) {
+    return res.status(500).json({ message: 'Tenant context missing' });
+  }
+  const student = await getStudent(req.tenantClient!, req.tenant.schema, req.params.id);
   if (!student) {
     return res.status(404).json({ message: 'Student not found' });
   }
@@ -35,7 +41,10 @@ router.post('/', async (req, res, next) => {
   }
 
   try {
-    const student = await createStudent(req.tenantClient!, parsed.data);
+    if (!req.tenantClient || !req.tenant) {
+      return res.status(500).json({ message: 'Tenant context missing' });
+    }
+    const student = await createStudent(req.tenantClient!, req.tenant.schema, parsed.data);
     res.status(201).json(student);
   } catch (error) {
     next(error);
@@ -48,7 +57,15 @@ router.put('/:id', async (req, res) => {
     return res.status(400).json({ message: parsed.error.message });
   }
 
-  const student = await updateStudent(req.tenantClient!, req.params.id, parsed.data);
+  if (!req.tenantClient || !req.tenant) {
+    return res.status(500).json({ message: 'Tenant context missing' });
+  }
+  const student = await updateStudent(
+    req.tenantClient!,
+    req.tenant.schema,
+    req.params.id,
+    parsed.data
+  );
   if (!student) {
     return res.status(404).json({ message: 'Student not found' });
   }
@@ -56,9 +73,11 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  await deleteStudent(req.tenantClient!, req.params.id);
+  if (!req.tenantClient || !req.tenant) {
+    return res.status(500).json({ message: 'Tenant context missing' });
+  }
+  await deleteStudent(req.tenantClient!, req.tenant.schema, req.params.id);
   res.status(204).send();
 });
 
 export default router;
-

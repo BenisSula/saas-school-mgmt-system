@@ -1,22 +1,28 @@
 import type { PoolClient } from 'pg';
 import { StudentInput } from '../validators/studentValidator';
+import { assertValidSchemaName } from '../db/tenantManager';
 
 const table = 'students';
 
-export async function listStudents(client: PoolClient) {
-  const result = await client.query(`SELECT * FROM ${table} ORDER BY created_at DESC`);
+function tableName(schema: string): string {
+  assertValidSchemaName(schema);
+  return `${schema}.${table}`;
+}
+
+export async function listStudents(client: PoolClient, schema: string) {
+  const result = await client.query(`SELECT * FROM ${tableName(schema)} ORDER BY created_at DESC`);
   return result.rows;
 }
 
-export async function getStudent(client: PoolClient, id: string) {
-  const result = await client.query(`SELECT * FROM ${table} WHERE id = $1`, [id]);
+export async function getStudent(client: PoolClient, schema: string, id: string) {
+  const result = await client.query(`SELECT * FROM ${tableName(schema)} WHERE id = $1`, [id]);
   return result.rows[0];
 }
 
-export async function createStudent(client: PoolClient, payload: StudentInput) {
+export async function createStudent(client: PoolClient, schema: string, payload: StudentInput) {
   const result = await client.query(
     `
-      INSERT INTO ${table} (first_name, last_name, date_of_birth, class_id, admission_number, parent_contacts)
+      INSERT INTO ${tableName(schema)} (first_name, last_name, date_of_birth, class_id, admission_number, parent_contacts)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `,
@@ -33,8 +39,13 @@ export async function createStudent(client: PoolClient, payload: StudentInput) {
   return result.rows[0];
 }
 
-export async function updateStudent(client: PoolClient, id: string, payload: Partial<StudentInput>) {
-  const existing = await getStudent(client, id);
+export async function updateStudent(
+  client: PoolClient,
+  schema: string,
+  id: string,
+  payload: Partial<StudentInput>
+) {
+  const existing = await getStudent(client, schema, id);
   if (!existing) {
     return null;
   }
@@ -50,7 +61,7 @@ export async function updateStudent(client: PoolClient, id: string, payload: Par
 
   const result = await client.query(
     `
-      UPDATE ${table}
+      UPDATE ${tableName(schema)}
       SET first_name = $1,
           last_name = $2,
           date_of_birth = $3,
@@ -75,7 +86,34 @@ export async function updateStudent(client: PoolClient, id: string, payload: Par
   return result.rows[0];
 }
 
-export async function deleteStudent(client: PoolClient, id: string) {
-  await client.query(`DELETE FROM ${table} WHERE id = $1`, [id]);
+export async function deleteStudent(client: PoolClient, schema: string, id: string) {
+  await client.query(`DELETE FROM ${tableName(schema)} WHERE id = $1`, [id]);
 }
 
+export async function moveStudentToClass(
+  client: PoolClient,
+  schema: string,
+  id: string,
+  classId: string
+) {
+  const existing = await getStudent(client, schema, id);
+  if (!existing) {
+    return null;
+  }
+
+  const result = await client.query(
+    `
+      UPDATE ${tableName(schema)}
+      SET class_id = $1,
+          updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `,
+    [classId, id]
+  );
+
+  return {
+    previousClassId: existing.class_id as string | null,
+    student: result.rows[0]
+  };
+}
