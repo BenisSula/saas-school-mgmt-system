@@ -17,11 +17,14 @@ type MockAuthRequest = Request & {
   };
 };
 
+// Generate a UUID for the mock teacher user - use module-level constant
+const MOCK_TEACHER_ID = crypto.randomUUID();
+
 jest.mock('../src/middleware/authenticate', () => ({
   __esModule: true,
   default: (req: MockAuthRequest, _res: Response, next: NextFunction) => {
     req.user = {
-      id: 'teacher-user',
+      id: MOCK_TEACHER_ID,
       role: 'teacher',
       tenantId: 'tenant_alpha',
       email: 'jane@example.com',
@@ -55,7 +58,7 @@ describe('Teacher dashboard routes', () => {
     pool = testPool.pool;
     mockedGetPool.mockReturnValue(pool);
 
-    await createTenant(
+    const tenant = await createTenant(
       {
         name: 'Teacher School',
         schemaName: 'tenant_alpha'
@@ -72,6 +75,17 @@ describe('Teacher dashboard routes', () => {
     const assignmentSciId = crypto.randomUUID();
     studentAId = crypto.randomUUID();
     studentBId = crypto.randomUUID();
+
+    // Create user in shared.users for the teacher (required for verifyTeacherAssignment middleware)
+    // Use the same UUID as the mock
+    await pool.query(
+      `
+        INSERT INTO shared.users (id, email, password_hash, role, tenant_id, is_verified, status)
+        VALUES ($1, 'jane@example.com', 'hash', 'teacher', $2, true, 'active')
+        ON CONFLICT (email) DO UPDATE SET id = EXCLUDED.id
+      `,
+      [MOCK_TEACHER_ID, tenant.id]
+    );
 
     await pool.query(
       `
@@ -110,9 +124,9 @@ describe('Teacher dashboard routes', () => {
 
     await pool.query(
       `
-        INSERT INTO tenant_alpha.students (id, first_name, last_name, class_id, parent_contacts)
-        VALUES ($1, 'Alex', 'Johnson', $3, '[]'::jsonb),
-               ($2, 'Maya', 'Lee', $3, '[]'::jsonb)
+        INSERT INTO tenant_alpha.students (id, first_name, last_name, class_id, class_uuid, parent_contacts)
+        VALUES ($1, 'Alex', 'Johnson', 'Grade 7', $3, '[]'::jsonb),
+               ($2, 'Maya', 'Lee', 'Grade 7', $3, '[]'::jsonb)
       `,
       [studentAId, studentBId, classAId]
     );
@@ -174,10 +188,11 @@ describe('Teacher dashboard routes', () => {
   });
 
   it('returns roster for assigned class', async () => {
-    const roster = await request(app)
-      .get(`/teacher/classes/${classAId}/roster`)
-      .set(authHeaders)
-      .expect(200);
+    const roster = await request(app).get(`/teacher/classes/${classAId}/roster`).set(authHeaders);
+    if (roster.status !== 200) {
+      console.error('Roster error response:', roster.status, roster.body);
+    }
+    expect(roster.status).toBe(200);
     expect(roster.body).toHaveLength(2);
   });
 
@@ -190,10 +205,11 @@ describe('Teacher dashboard routes', () => {
   });
 
   it('generates class report and pdf', async () => {
-    const report = await request(app)
-      .get(`/teacher/reports/class/${classAId}`)
-      .set(authHeaders)
-      .expect(200);
+    const report = await request(app).get(`/teacher/reports/class/${classAId}`).set(authHeaders);
+    if (report.status !== 200) {
+      console.error('Report error response:', report.status, report.body);
+    }
+    expect(report.status).toBe(200);
     expect(report.body.attendance.total).toBeGreaterThan(0);
 
     const pdf = await request(app)

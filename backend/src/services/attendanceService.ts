@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { assertValidSchemaName } from '../db/tenantManager';
+import { checkTeacherAssignment } from '../middleware/verifyTeacherAssignment';
 
 export interface AttendanceMark {
   studentId: string;
@@ -10,12 +11,66 @@ export interface AttendanceMark {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Service-level helper to verify teacher assignment.
+ * This provides an additional security layer even if route-level checks are bypassed.
+ */
+async function verifyTeacherAssignmentInService(
+  client: PoolClient,
+  schemaName: string,
+  actorId: string,
+  classId: string
+): Promise<void> {
+  // Check if actor is a teacher
+  const userCheck = await client.query<{ role: string; email: string }>(
+    `SELECT role, email FROM shared.users WHERE id = $1`,
+    [actorId]
+  );
+  const user = userCheck.rows[0];
+
+  if (!user || user.role !== 'teacher') {
+    return; // Not a teacher, skip check (admin/superadmin allowed)
+  }
+
+  if (!user.email) {
+    throw new Error('Teacher email not found');
+  }
+
+  // Get teacher_id from teachers table
+  const teacherCheck = await client.query<{ id: string }>(
+    `SELECT id FROM ${schemaName}.teachers WHERE email = $1`,
+    [user.email]
+  );
+  const teacherId = teacherCheck.rows[0]?.id;
+
+  if (!teacherId) {
+    throw new Error('Teacher profile not found');
+  }
+
+  // Verify assignment
+  const isAssigned = await checkTeacherAssignment(client, schemaName, teacherId, classId);
+  if (!isAssigned) {
+    throw new Error('Teacher is not assigned to this class');
+  }
+}
+
 export async function markAttendance(
   client: PoolClient,
   schemaName: string,
-  records: AttendanceMark[]
+  records: AttendanceMark[],
+  actorId?: string
 ): Promise<void> {
   assertValidSchemaName(schemaName);
+
+  // Service-level verification: if actor is a teacher, verify assignment to class
+  // This provides defense-in-depth even if route-level checks are bypassed
+  if (actorId && records.length > 0) {
+    const firstRecord = records[0];
+    if (firstRecord.classId) {
+      await verifyTeacherAssignmentInService(client, schemaName, actorId, firstRecord.classId);
+    }
+  }
+
   const query = `
     INSERT INTO ${schemaName}.attendance_records (student_id, class_id, status, marked_by, attendance_date, metadata)
     VALUES ($1, $2, $3, $4, $5, $6::jsonb)

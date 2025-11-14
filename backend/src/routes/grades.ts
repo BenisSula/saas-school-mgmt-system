@@ -1,37 +1,54 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import authenticate from '../middleware/authenticate';
 import tenantResolver from '../middleware/tenantResolver';
+import ensureTenantContext from '../middleware/ensureTenantContext';
+import verifyTeacherAssignment from '../middleware/verifyTeacherAssignment';
 import { requirePermission } from '../middleware/rbac';
 import { gradeBulkSchema } from '../validators/examValidator';
 import { bulkUpsertGrades } from '../services/examService';
 
 const router = Router();
 
-router.use(authenticate, tenantResolver(), requirePermission('grades:manage'));
+router.use(
+  authenticate,
+  tenantResolver(),
+  ensureTenantContext(),
+  requirePermission('grades:manage')
+);
 
-router.post('/bulk', async (req, res, next) => {
-  const tenant = req.tenant;
-  if (!req.tenantClient || !tenant) {
-    return res.status(500).json({ message: 'Tenant context missing' });
-  }
-
+// Middleware to extract classId from request body for teacher assignment verification
+const extractClassIdForVerification = (req: Request, res: Response, next: NextFunction) => {
   const parsed = gradeBulkSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ message: parsed.error.message });
+  if (parsed.success && parsed.data.entries.length > 0 && parsed.data.entries[0]?.classId) {
+    // Attach classId to request for middleware to use
+    req.body._classIdForVerification = parsed.data.entries[0].classId;
   }
+  next();
+};
 
-  try {
-    const grades = await bulkUpsertGrades(
-      req.tenantClient,
-      tenant.schema,
-      parsed.data.examId,
-      parsed.data.entries,
-      req.user?.id
-    );
-    res.status(200).json({ saved: grades.length });
-  } catch (error) {
-    next(error);
+router.post(
+  '/bulk',
+  extractClassIdForVerification,
+  verifyTeacherAssignment({ classIdParam: '_classIdForVerification', allowAdmins: true }),
+  async (req, res, next) => {
+    const parsed = gradeBulkSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.message });
+    }
+
+    try {
+      const grades = await bulkUpsertGrades(
+        req.tenantClient!,
+        req.tenant!.schema,
+        parsed.data.examId,
+        parsed.data.entries,
+        req.user?.id
+      );
+      res.status(200).json({ saved: grades?.length ?? 0 });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 export default router;

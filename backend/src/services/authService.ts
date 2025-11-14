@@ -18,6 +18,8 @@ import {
   rotateSessionToken,
   SessionContext
 } from './platformMonitoringService';
+import { createTenant as createTenantSchema, createSchemaSlug } from '../db/tenantManager';
+import { createUser } from './userService';
 
 const PASSWORD_RESET_TTL = Number(process.env.PASSWORD_RESET_TTL ?? 60 * 30); // 30 minutes
 const EMAIL_VERIFICATION_TTL = Number(process.env.EMAIL_VERIFICATION_TTL ?? 60 * 60 * 24); // 24 hours
@@ -27,6 +29,7 @@ export interface SignUpInput {
   password: string;
   role: Role;
   tenantId?: string;
+  tenantName?: string;
 }
 
 export interface LoginInput {
@@ -44,6 +47,7 @@ export interface AuthResponse {
     role: Role;
     tenantId: string | null;
     isVerified: boolean;
+    status: 'pending' | 'active' | 'suspended' | 'rejected';
   };
 }
 
@@ -54,6 +58,7 @@ interface DbUserRow {
   tenant_id: string | null;
   is_verified: boolean;
   password_hash?: string;
+  status?: string;
 }
 
 async function getDbPool(): Promise<Pool> {
@@ -74,7 +79,7 @@ async function findUserByEmail(pool: Pool, email: string): Promise<DbUserRow | u
 function buildTokenPayload(user: DbUserRow): TokenPayload {
   return {
     userId: user.id,
-    tenantId: user.tenant_id ?? 'shared',
+    tenantId: user.tenant_id ?? '',
     email: user.email,
     role: user.role as Role
   };
@@ -84,36 +89,82 @@ export async function signUp(input: SignUpInput): Promise<AuthResponse> {
   const pool = await getDbPool();
   const normalizedEmail = input.email.toLowerCase();
 
-  if (input.role !== 'superadmin' && !input.tenantId) {
-    throw new Error('tenantId is required for non-superadmin roles');
-  }
-
-  if (input.tenantId) {
-    const tenant = await findTenantById(pool, input.tenantId);
-    if (!tenant) {
-      throw new Error('Tenant not found');
-    }
-  }
-
   const existing = await findUserByEmail(pool, normalizedEmail);
   if (existing) {
     throw new Error('User already exists');
   }
 
-  const passwordHash = await argon2.hash(input.password);
-  const tenantId = input.role === 'superadmin' ? null : (input.tenantId ?? null);
-  const userId = crypto.randomUUID();
+  let resolvedTenantId: string | null = null;
 
-  const result = await pool.query(
-    `
-      INSERT INTO shared.users (id, email, password_hash, role, tenant_id, is_verified)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, email, role, tenant_id, is_verified
-    `,
-    [userId, normalizedEmail, passwordHash, input.role, tenantId, input.role === 'superadmin']
-  );
+  if (input.role === 'superadmin') {
+    resolvedTenantId = null;
+  } else if (input.tenantId) {
+    const tenant = await findTenantById(pool, input.tenantId);
+    if (!tenant) {
+      throw new Error('Tenant not found');
+    }
+    resolvedTenantId = tenant.id;
+  } else if (input.role === 'admin' && input.tenantName) {
+    const tenantName = input.tenantName.trim();
+    if (!tenantName) {
+      throw new Error('Tenant name is required for admin registration without tenant ID');
+    }
 
-  const user = result.rows[0] as DbUserRow;
+    const schemaName = createSchemaSlug(tenantName);
+    const tenant = await createTenantSchema(
+      {
+        name: tenantName,
+        schemaName,
+        subscriptionType: 'trial',
+        status: 'active',
+        billingEmail: normalizedEmail
+      },
+      pool
+    );
+    resolvedTenantId = tenant.id;
+  } else if (input.role === 'admin' && !input.tenantId) {
+    throw new Error('Either tenantId or tenantName is required for admin registration');
+  } else if (!input.tenantId) {
+    throw new Error('tenantId is required for non-admin roles');
+  } else {
+    const tenant = await findTenantById(pool, input.tenantId);
+    if (!tenant) {
+      throw new Error('Tenant not found');
+    }
+    resolvedTenantId = tenant.id;
+  }
+
+  // Determine user status based on role and context
+  let userStatus: 'pending' | 'active' = 'pending';
+  if (input.role === 'superadmin') {
+    userStatus = 'active';
+  } else if (input.role === 'admin' && input.tenantName) {
+    // Admin creating new tenant is automatically active
+    userStatus = 'active';
+  } else if (input.role === 'admin' && input.tenantId) {
+    // Admin joining existing tenant needs approval
+    userStatus = 'pending';
+  }
+  // teacher, student, hod default to 'pending' (requires admin approval)
+
+  // Use centralized user creation function
+  const createdUser = await createUser(pool, {
+    email: normalizedEmail,
+    password: input.password,
+    role: input.role,
+    tenantId: resolvedTenantId,
+    status: userStatus,
+    isVerified: input.role === 'superadmin' || input.role === 'admin'
+  });
+
+  const user: DbUserRow = {
+    id: createdUser.id,
+    email: createdUser.email,
+    role: createdUser.role,
+    tenant_id: createdUser.tenant_id,
+    is_verified: createdUser.is_verified,
+    status: createdUser.status
+  };
 
   const payload = buildTokenPayload(user);
   const accessToken = generateAccessToken(payload);
@@ -131,7 +182,8 @@ export async function signUp(input: SignUpInput): Promise<AuthResponse> {
       email: user.email,
       role: user.role,
       tenantId: user.tenant_id,
-      isVerified: user.is_verified
+      isVerified: user.is_verified,
+      status: (user.status as 'pending' | 'active' | 'suspended' | 'rejected') ?? 'pending'
     }
   };
 }
@@ -164,7 +216,8 @@ export async function login(input: LoginInput, context?: SessionContext): Promis
       email: user.email,
       role: user.role,
       tenantId: user.tenant_id,
-      isVerified: user.is_verified
+      isVerified: user.is_verified,
+      status: (user.status as 'pending' | 'active' | 'suspended' | 'rejected') ?? 'pending'
     }
   };
 
@@ -205,7 +258,8 @@ export async function refreshToken(token: string, context?: SessionContext): Pro
       email: user.email,
       role: user.role,
       tenantId: user.tenant_id,
-      isVerified: user.is_verified
+      isVerified: user.is_verified,
+      status: (user.status as 'pending' | 'active' | 'suspended' | 'rejected') ?? 'pending'
     }
   };
 }

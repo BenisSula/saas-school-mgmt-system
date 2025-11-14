@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { PoolClient } from 'pg';
 import PDFDocument from 'pdfkit';
+import { checkTeacherAssignment } from '../middleware/verifyTeacherAssignment';
 
 export interface ExamInput {
   name: string;
@@ -60,6 +61,40 @@ async function fetchGradeScales(client: PoolClient, schema: string): Promise<Gra
      ORDER BY min_score DESC`
   );
   return result.rows;
+}
+
+export async function getGradeScales(client: PoolClient, schema: string): Promise<GradeScale[]> {
+  return fetchGradeScales(client, schema);
+}
+
+export async function listExams(client: PoolClient, schema: string) {
+  const result = await client.query(
+    `
+      SELECT 
+        e.id,
+        e.name,
+        e.description,
+        e.exam_date,
+        e.metadata,
+        e.created_at,
+        COUNT(DISTINCT es.id) as session_count,
+        COUNT(DISTINCT es.class_id) as class_count
+      FROM ${qualified(schema, EXAM_TABLE)} e
+      LEFT JOIN ${qualified(schema, SESSION_TABLE)} es ON e.id = es.exam_id
+      GROUP BY e.id, e.name, e.description, e.exam_date, e.metadata, e.created_at
+      ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC
+    `
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    examDate: row.exam_date,
+    metadata: row.metadata,
+    createdAt: row.created_at,
+    classes: Number(row.class_count) || 0,
+    sessions: Number(row.session_count) || 0
+  }));
 }
 
 function resolveGrade(
@@ -126,6 +161,49 @@ export async function createExamSession(
   return result.rows[0];
 }
 
+/**
+ * Service-level helper to verify teacher assignment.
+ * This provides an additional security layer even if route-level checks are bypassed.
+ */
+async function verifyTeacherAssignmentInService(
+  client: PoolClient,
+  schema: string,
+  actorId: string,
+  classId: string
+): Promise<void> {
+  // Check if actor is a teacher
+  const userCheck = await client.query<{ role: string; email: string }>(
+    `SELECT role, email FROM shared.users WHERE id = $1`,
+    [actorId]
+  );
+  const user = userCheck.rows[0];
+
+  if (!user || user.role !== 'teacher') {
+    return; // Not a teacher, skip check (admin/superadmin allowed)
+  }
+
+  if (!user.email) {
+    throw new Error('Teacher email not found');
+  }
+
+  // Get teacher_id from teachers table
+  const teacherCheck = await client.query<{ id: string }>(
+    `SELECT id FROM ${qualified(schema, 'teachers')} WHERE email = $1`,
+    [user.email]
+  );
+  const teacherId = teacherCheck.rows[0]?.id;
+
+  if (!teacherId) {
+    throw new Error('Teacher profile not found');
+  }
+
+  // Verify assignment
+  const isAssigned = await checkTeacherAssignment(client, schema, teacherId, classId);
+  if (!isAssigned) {
+    throw new Error('Teacher is not assigned to this class');
+  }
+}
+
 export async function bulkUpsertGrades(
   client: PoolClient,
   schema: string,
@@ -133,6 +211,15 @@ export async function bulkUpsertGrades(
   entries: GradeEntryInput[],
   actorId?: string
 ) {
+  // Service-level verification: if actor is a teacher, verify assignment to class
+  // This provides defense-in-depth even if route-level checks are bypassed
+  if (actorId && entries.length > 0) {
+    const firstEntry = entries[0];
+    if (firstEntry.classId) {
+      await verifyTeacherAssignmentInService(client, schema, actorId, firstEntry.classId);
+    }
+  }
+
   const scales = await fetchGradeScales(client, schema);
   const upserted = [];
 

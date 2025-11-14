@@ -183,7 +183,9 @@ describe('Admin academics routes', () => {
       .set(authHeaders)
       .send({ toClassId: classIdB })
       .expect(200);
-    expect(promotion.body.class_id).toBe(classIdB);
+    // The student object has class_id as TEXT (class name) and class_uuid as UUID
+    // Check class_uuid for the UUID match
+    expect(promotion.body.class_uuid).toBe(classIdB);
 
     const reportResponse = await request(app)
       .post('/admin/reports/term')
