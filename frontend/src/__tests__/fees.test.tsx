@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, it, expect } from 'vitest';
 import StudentFeesPage from '../pages/student/StudentFeesPage';
@@ -17,12 +17,19 @@ describe('Fee pages', () => {
     expect(screen.getByText(/Loading invoices…/i)).toBeInTheDocument();
   });
 
-  it('allows admin to add invoice items', () => {
+  it('allows admin to add invoice items', async () => {
     renderWithDashboard(<AdminInvoicePage />);
     expect(screen.getByText(/Invoice Generation/i)).toBeInTheDocument();
-    const addItemButton = screen.getByRole('button', { name: /Add Item/i });
+    // First, open the modal by clicking "Create Invoice"
+    const createInvoiceButton = screen.getByRole('button', { name: /Create Invoice/i });
+    fireEvent.click(createInvoiceButton);
+    // Wait for the modal to appear and find the "Add Item" button
+    const addItemButton = await waitFor(() => screen.getByRole('button', { name: /Add Item/i }));
     fireEvent.click(addItemButton);
-    const textInputs = screen.getAllByPlaceholderText(/Description/i);
-    expect(textInputs.length).toBeGreaterThan(1);
+    // Wait for the new input to appear - check for inputs with "Item" in the label
+    await waitFor(() => {
+      const textInputs = screen.getAllByLabelText(/Item \d+ Description/i);
+      expect(textInputs.length).toBeGreaterThan(1);
+    });
   });
 });

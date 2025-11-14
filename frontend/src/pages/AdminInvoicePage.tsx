@@ -237,6 +237,7 @@ export function AdminInvoicePage() {
                 type="button"
                 variant="outline"
                 size="sm"
+                aria-label="Add Item"
                 onClick={() => setItems((current) => [...current, { description: '', amount: 0 }])}
               >
                 Add Item

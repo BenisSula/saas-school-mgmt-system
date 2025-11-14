@@ -91,17 +91,21 @@ describe('Auth flows', () => {
       </MemoryRouter>
     );
 
+    await user.type(screen.getByLabelText(/Full name/i), 'Jane Doe');
     await user.type(screen.getByLabelText(/Work email/i), 'Teacher@Example.COM');
-    await user.type(screen.getByLabelText(/Password/i), 'StrongPass123!');
-    await user.type(screen.getByLabelText(/Tenant ID/i), 'Tenant_Beta');
-    await user.click(screen.getByRole('button', { name: /Submit request/i }));
+    // Use getByPlaceholderText to find the password input specifically (more specific than label)
+    await user.type(screen.getByPlaceholderText(/Create a secure password/i), 'StrongPass123!');
+    // Note: RegisterForm doesn't have a Tenant ID field - tenantId is passed via defaultTenantId prop or in the payload
+    // For teacher role without defaultTenantId, no tenant field is shown
+    await user.click(screen.getByRole('button', { name: /Create account/i }));
 
     await waitFor(() => expect(mockAuthState.register).toHaveBeenCalled());
+    // The form doesn't collect tenantId for teacher role, so it won't be in the payload
     expect(mockAuthState.register).toHaveBeenCalledWith({
       email: 'teacher@example.com',
       password: 'StrongPass123!',
-      role: 'teacher',
-      tenantId: 'Tenant_Beta'
+      role: 'teacher'
+      // tenantId is not included when defaultRole is 'teacher' and no defaultTenantId is provided
     });
     expect(toast.info).toHaveBeenCalledWith(
       'Account created and pending admin approval. We will notify you once activated.'

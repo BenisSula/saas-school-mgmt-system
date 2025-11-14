@@ -34,9 +34,12 @@ describe('Exam pages', () => {
     expect(container.querySelector('.animate-pulse')).not.toBeNull();
   });
 
-  it('renders admin configuration tools', () => {
+  it('renders admin configuration tools', async () => {
     renderWithDashboard(<AdminExamConfigPage />);
-    expect(screen.getByText(/Examination Configuration/i)).toBeInTheDocument();
+    // Use getByRole to find the heading, which is more reliable
+    expect(
+      await screen.findByRole('heading', { name: /Examination Configuration/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/Upcoming Exams/i)).toBeInTheDocument();
   });
 });
