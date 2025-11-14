@@ -38,7 +38,7 @@ jest.mock('../src/db/connection', () => ({
 const mockedGetPool = getPool as unknown as jest.Mock;
 
 describe('User management routes', () => {
-  const headers = { Authorization: 'Bearer fake', 'x-tenant-id': 'tenant_alpha' };
+  let headers: { Authorization: string; 'x-tenant-id': string };
   let tenantId: string;
   let targetUserId: string;
 
@@ -54,6 +54,9 @@ describe('User management routes', () => {
       pool
     );
     tenantId = tenant.id;
+    // Use schema name in header (tenantResolver can find by ID or schema_name)
+    // Using schema name is more reliable in tests
+    headers = { Authorization: 'Bearer fake', 'x-tenant-id': 'tenant_alpha' };
 
     targetUserId = randomUUID();
     await pool.query(

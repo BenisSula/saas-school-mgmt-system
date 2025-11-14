@@ -12,6 +12,9 @@ router.use(authenticate, tenantResolver(), ensureTenantContext());
 
 router.get('/', requirePermission('users:manage'), async (req, res, next) => {
   try {
+    if (!req.tenant) {
+      return res.status(400).json({ message: 'Tenant context required' });
+    }
     const { status, role } = req.query;
     const filters: { status?: string; role?: string } = {};
     if (status && typeof status === 'string') {
@@ -20,7 +23,7 @@ router.get('/', requirePermission('users:manage'), async (req, res, next) => {
     if (role && typeof role === 'string') {
       filters.role = role;
     }
-    const users = await listTenantUsers(req.tenant!.id, filters);
+    const users = await listTenantUsers(req.tenant.id, filters);
     res.json(users);
   } catch (error) {
     next(error);

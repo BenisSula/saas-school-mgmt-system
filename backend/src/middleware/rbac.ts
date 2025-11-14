@@ -1,5 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { Permission, Role, hasPermission } from '../config/permissions';
+import { logUnauthorizedAttempt } from '../services/auditLogService';
+import {
+  FRIENDLY_FORBIDDEN_MESSAGE,
+  FRIENDLY_MISSING_TARGET_ID,
+  FRIENDLY_TENANT_CONTEXT_ERROR
+} from '../lib/friendlyMessages';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -11,18 +17,62 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+interface GuardedUser {
+  id: string;
+  role: Role;
+  tenantId: string;
+  email: string;
+  tokenId: string;
+}
+
+function hasRequiredPermission(user: GuardedUser, permission: Permission | undefined): boolean {
+  if (!permission) {
+    return false;
+  }
+  return hasPermission(user.role, permission);
+}
+
+/**
+ * Requires the user to have one of the specified roles.
+ * Superadmin is implicitly allowed if 'admin' is in the allowed roles.
+ */
 export function requireRole(allowedRoles: Role[]) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const role = req.user?.role;
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user as GuardedUser | undefined;
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthenticated' });
+      }
 
-    if (!role || !allowedRoles.includes(role)) {
-      return res.status(403).json({ message: 'Forbidden' });
+      const allowed = new Set<Role>(allowedRoles);
+
+      if (allowed.has(user.role)) {
+        return next();
+      }
+
+      // Superadmin is implicitly allowed if 'admin' is in allowed roles
+      if (allowed.has('admin') && (user.role === 'admin' || user.role === 'superadmin')) {
+        return next();
+      }
+
+      await logUnauthorizedAttempt(req.tenantClient, req.tenant?.schema, {
+        userId: user.id,
+        path: req.originalUrl ?? req.path,
+        method: req.method,
+        reason: 'Role not permitted',
+        details: { allowedRoles, userRole: user.role }
+      });
+
+      return res.status(403).json({ message: FRIENDLY_FORBIDDEN_MESSAGE });
+    } catch (error) {
+      return next(error);
     }
-
-    return next();
   };
 }
 
+/**
+ * Requires the user to have the specified permission.
+ */
 export function requirePermission(permission: Permission) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const role = req.user?.role;
@@ -32,6 +82,63 @@ export function requirePermission(permission: Permission) {
     }
 
     return next();
+  };
+}
+
+/**
+ * Allows access if the user is accessing their own resource OR has the required permission.
+ * Superadmin always has access.
+ * @param permission - Optional permission to check
+ * @param idParam - Parameter name for the target user ID (default: 'studentId')
+ */
+export function requireSelfOrPermission(permission?: Permission, idParam = 'studentId') {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user as GuardedUser | undefined;
+      if (!user) {
+        return res.status(401).json({ message: 'Unauthenticated' });
+      }
+
+      const targetId =
+        (req.params && req.params[idParam]) ||
+        (req.body && (req.body[idParam] as string | undefined)) ||
+        (req.query && (req.query[idParam] as string | undefined));
+
+      if (!targetId) {
+        return res.status(400).json({ message: FRIENDLY_MISSING_TARGET_ID });
+      }
+
+      // Superadmin always has access
+      if (user.role === 'superadmin') {
+        return next();
+      }
+
+      // User accessing their own resource
+      if (user.id === targetId) {
+        return next();
+      }
+
+      // User has required permission
+      if (hasRequiredPermission(user, permission)) {
+        return next();
+      }
+
+      await logUnauthorizedAttempt(req.tenantClient, req.tenant?.schema, {
+        userId: user.id,
+        entityId: targetId,
+        path: req.originalUrl ?? req.path,
+        method: req.method,
+        reason: permission ? `Missing permission: ${permission}` : 'Self-access denied'
+      });
+
+      if (!req.tenantClient || !req.tenant) {
+        return res.status(500).json({ message: FRIENDLY_TENANT_CONTEXT_ERROR });
+      }
+
+      return res.status(403).json({ message: FRIENDLY_FORBIDDEN_MESSAGE });
+    } catch (error) {
+      return next(error);
+    }
   };
 }
 

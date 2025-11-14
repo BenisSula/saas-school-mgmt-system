@@ -55,7 +55,7 @@ describe('Teacher dashboard routes', () => {
     pool = testPool.pool;
     mockedGetPool.mockReturnValue(pool);
 
-    await createTenant(
+    const tenant = await createTenant(
       {
         name: 'Teacher School',
         schemaName: 'tenant_alpha'
@@ -72,6 +72,16 @@ describe('Teacher dashboard routes', () => {
     const assignmentSciId = crypto.randomUUID();
     studentAId = crypto.randomUUID();
     studentBId = crypto.randomUUID();
+
+    // Create user in shared.users for the teacher (required for verifyTeacherAssignment middleware)
+    await pool.query(
+      `
+        INSERT INTO shared.users (id, email, password_hash, role, tenant_id, is_verified, status)
+        VALUES ('teacher-user', 'jane@example.com', 'hash', 'teacher', $1, true, 'active')
+        ON CONFLICT (email) DO UPDATE SET id = EXCLUDED.id
+      `,
+      [tenant.id]
+    );
 
     await pool.query(
       `
@@ -110,9 +120,9 @@ describe('Teacher dashboard routes', () => {
 
     await pool.query(
       `
-        INSERT INTO tenant_alpha.students (id, first_name, last_name, class_id, parent_contacts)
-        VALUES ($1, 'Alex', 'Johnson', $3, '[]'::jsonb),
-               ($2, 'Maya', 'Lee', $3, '[]'::jsonb)
+        INSERT INTO tenant_alpha.students (id, first_name, last_name, class_id, class_uuid, parent_contacts)
+        VALUES ($1, 'Alex', 'Johnson', 'Grade 7', $3, '[]'::jsonb),
+               ($2, 'Maya', 'Lee', 'Grade 7', $3, '[]'::jsonb)
       `,
       [studentAId, studentBId, classAId]
     );

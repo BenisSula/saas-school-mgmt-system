@@ -28,9 +28,20 @@ router.post('/bulk', async (req, res, next) => {
       if (firstEntry.classId) {
         const { checkTeacherAssignment } = await import('../middleware/verifyTeacherAssignment');
         // Get teacher_id from teachers table using user email
-        const teacherResult = await req.tenantClient!.query(
-          `SELECT id FROM ${req.tenant!.schema}.teachers WHERE email = (SELECT email FROM shared.users WHERE id = $1)`,
+        // First get the user email, then find the teacher
+        const userResult = await req.tenantClient!.query(
+          `SELECT email FROM shared.users WHERE id = $1`,
           [req.user.id]
+        );
+        const userEmail = userResult.rows[0]?.email;
+        if (!userEmail) {
+          // If user email not found, skip assignment check (might be admin or service account)
+          // Continue with the request
+        } else {
+        
+        const teacherResult = await req.tenantClient!.query(
+          `SELECT id FROM ${req.tenant!.schema}.teachers WHERE email = $1`,
+          [userEmail]
         );
         const teacherId = teacherResult.rows[0]?.id;
 
@@ -47,6 +58,8 @@ router.post('/bulk', async (req, res, next) => {
             });
           }
         }
+        // If teacherId not found, allow through (might be admin or service account)
+        }
       }
     }
 
@@ -57,7 +70,7 @@ router.post('/bulk', async (req, res, next) => {
       parsed.data.entries,
       req.user?.id
     );
-    res.status(200).json({ saved: grades.length });
+    res.status(200).json({ saved: grades?.length ?? 0 });
   } catch (error) {
     next(error);
   }

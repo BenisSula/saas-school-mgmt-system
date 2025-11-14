@@ -29,9 +29,20 @@ router.post('/mark', requirePermission('attendance:manage'), async (req, res, ne
       // Get teacher_id from teachers table using user email
       const { checkTeacherAssignment } = await import('../middleware/verifyTeacherAssignment');
       try {
-        const teacherResult = await req.tenantClient!.query(
-          `SELECT id FROM ${req.tenant!.schema}.teachers WHERE email = (SELECT email FROM shared.users WHERE id = $1)`,
+        // First get the user email, then find the teacher
+        const userResult = await req.tenantClient!.query(
+          `SELECT email FROM shared.users WHERE id = $1`,
           [req.user.id]
+        );
+        const userEmail = userResult.rows[0]?.email;
+        if (!userEmail) {
+          // If user email not found, skip assignment check (might be admin or service account)
+          // Continue with the request
+        } else {
+        
+        const teacherResult = await req.tenantClient!.query(
+          `SELECT id FROM ${req.tenant!.schema}.teachers WHERE email = $1`,
+          [userEmail]
         );
         const teacherId = teacherResult.rows[0]?.id;
 
@@ -49,6 +60,7 @@ router.post('/mark', requirePermission('attendance:manage'), async (req, res, ne
           }
         }
         // If teacherId not found, allow through (might be admin or service account)
+        }
       } catch (error) {
         // If lookup fails, log but don't block (might be test environment or edge case)
         console.warn('[attendance] Teacher lookup failed:', error);

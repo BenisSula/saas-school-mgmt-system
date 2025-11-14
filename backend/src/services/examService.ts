@@ -180,9 +180,19 @@ export async function bulkUpsertGrades(
 
       if (userRole === 'teacher') {
         // Get teacher_id from teachers table using user email
-        const teacherCheck = await client.query(
-          `SELECT id FROM ${qualified(schema, 'teachers')} WHERE email = (SELECT email FROM shared.users WHERE id = $1)`,
+        // First get the user email, then find the teacher
+        const userEmailResult = await client.query(
+          `SELECT email FROM shared.users WHERE id = $1`,
           [actorId]
+        );
+        const userEmail = userEmailResult.rows[0]?.email;
+        if (!userEmail) {
+          return; // Skip check if user email not found
+        }
+        
+        const teacherCheck = await client.query(
+          `SELECT id FROM ${qualified(schema, 'teachers')} WHERE email = $1`,
+          [userEmail]
         );
         const teacherId = teacherCheck.rows[0]?.id;
 

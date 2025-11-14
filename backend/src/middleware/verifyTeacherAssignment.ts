@@ -76,9 +76,21 @@ export function verifyTeacherAssignment(options: VerifyTeacherAssignmentOptions 
       }
 
       // Get teacher_id from teachers table using user email
-      const teacherResult = await req.tenantClient.query(
-        `SELECT id FROM ${req.tenant.schema}.teachers WHERE email = (SELECT email FROM shared.users WHERE id = $1)`,
+      // First get the user email, then find the teacher
+      const userResult = await req.tenantClient.query(
+        `SELECT email FROM shared.users WHERE id = $1`,
         [req.user.id]
+      );
+      const userEmail = userResult.rows[0]?.email;
+      if (!userEmail) {
+        return res.status(403).json({
+          message: 'Teacher profile not found. Please contact an administrator.'
+        });
+      }
+      
+      const teacherResult = await req.tenantClient.query(
+        `SELECT id FROM ${req.tenant.schema}.teachers WHERE email = $1`,
+        [userEmail]
       );
       const teacherId = teacherResult.rows[0]?.id;
 
