@@ -224,30 +224,35 @@ export async function getTeacherClassRoster(
   // The route handler will catch this and return 403
   await ensureTeacherHasClass(client, schema, teacherId, classId);
 
-  const result = await client.query(
-    `
-      SELECT id,
-             first_name,
-             last_name,
-             admission_number,
-             parent_contacts,
-             class_id,
-             class_uuid
-      FROM ${schema}.students
-      WHERE class_uuid = $1
-      ORDER BY last_name ASC, first_name ASC
-    `,
-    [classId]
-  );
+  try {
+    const result = await client.query(
+      `
+        SELECT id,
+               first_name,
+               last_name,
+               admission_number,
+               parent_contacts,
+               class_id,
+               class_uuid
+        FROM ${schema}.students
+        WHERE class_uuid = $1
+        ORDER BY last_name ASC, first_name ASC
+      `,
+      [classId]
+    );
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    first_name: row.first_name,
-    last_name: row.last_name,
-    admission_number: row.admission_number,
-    parent_contacts: parseJson<unknown[]>(row.parent_contacts, []),
-    class_id: row.class_id
-  }));
+    return result.rows.map((row) => ({
+      id: row.id,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      admission_number: row.admission_number,
+      parent_contacts: parseJson<unknown[]>(row.parent_contacts, []),
+      class_id: row.class_id
+    }));
+  } catch (error) {
+    console.error('getTeacherClassRoster error:', error);
+    throw new Error(`Failed to retrieve class roster: ${(error as Error).message}`);
+  }
 }
 
 export async function requestAssignmentDrop(
@@ -323,7 +328,10 @@ async function ensureTeacherHasClass(
   classId: string
 ): Promise<void> {
   const assignments = await listTeacherAssignmentsRows(client, schema, teacherId);
-  const isAssigned = assignments.some((assignment) => assignment.classId === classId);
+  // Compare as strings to handle UUID vs TEXT type differences
+  const isAssigned = assignments.some(
+    (assignment) => String(assignment.classId) === String(classId)
+  );
 
   if (!isAssigned) {
     throw new Error('Teacher is not assigned to this class');
@@ -350,96 +358,101 @@ export async function getTeacherClassReport(
   ]);
   const className = classResult.rows[0]?.name ?? 'Class';
 
-  const [studentResult, attendanceResult, gradeResult, feeResult] = await Promise.all([
-    client.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM ${schema}.students WHERE class_id = $1`,
-      [classId]
-    ),
-    client.query<{ status: 'present' | 'absent' | 'late'; count: string }>(
-      `
-        SELECT status, COUNT(*)::text AS count
-        FROM ${schema}.attendance_records
-        WHERE class_id = $1
-        GROUP BY status
-      `,
-      [classId]
-    ),
-    client.query<{ subject: string; entries: string; average: number }>(
-      `
-        SELECT subject,
-               COUNT(*)::text AS entries,
-               AVG(score)::float AS average
-        FROM ${schema}.grades
-        WHERE class_id = $1
-        GROUP BY subject
-        ORDER BY subject ASC
-      `,
-      [classId]
-    ),
-    client.query<{
-      billed: number | null;
-      paid: number | null;
-    }>(
-      `
-        SELECT
-          SUM(fi.amount)::float AS billed,
-          SUM(COALESCE(paid.total_paid, 0))::float AS paid
-        FROM ${schema}.fee_invoices fi
-        JOIN ${schema}.students s ON s.id = fi.student_id
-        LEFT JOIN (
-          SELECT invoice_id, SUM(amount) AS total_paid
-          FROM ${schema}.payments
-          WHERE status = 'succeeded'
-          GROUP BY invoice_id
-        ) AS paid ON paid.invoice_id = fi.id
-        WHERE s.class_id = $1
-      `,
-      [classId]
-    )
-  ]);
+  try {
+    const [studentResult, attendanceResult, gradeResult, feeResult] = await Promise.all([
+      client.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM ${schema}.students WHERE class_uuid = $1`,
+        [classId]
+      ),
+      client.query<{ status: 'present' | 'absent' | 'late'; count: string }>(
+        `
+          SELECT status, COUNT(*)::text AS count
+          FROM ${schema}.attendance_records
+          WHERE class_id = $1::text
+          GROUP BY status
+        `,
+        [classId]
+      ),
+      client.query<{ subject: string; entries: string; average: number }>(
+        `
+          SELECT subject,
+                 COUNT(*)::text AS entries,
+                 AVG(score)::float AS average
+          FROM ${schema}.grades
+          WHERE class_id = $1::text
+          GROUP BY subject
+          ORDER BY subject ASC
+        `,
+        [classId]
+      ),
+      client.query<{
+        billed: number | null;
+        paid: number | null;
+      }>(
+        `
+          SELECT
+            SUM(fi.amount)::float AS billed,
+            SUM(COALESCE(paid.total_paid, 0))::float AS paid
+          FROM ${schema}.fee_invoices fi
+          JOIN ${schema}.students s ON s.id = fi.student_id
+          LEFT JOIN (
+            SELECT invoice_id, SUM(amount) AS total_paid
+            FROM ${schema}.payments
+            WHERE status = 'succeeded'
+            GROUP BY invoice_id
+          ) AS paid ON paid.invoice_id = fi.id
+          WHERE s.class_uuid = $1
+        `,
+        [classId]
+      )
+    ]);
 
-  const studentCount = Number(studentResult.rows[0]?.count ?? '0');
-  const attendanceCounts = attendanceResult.rows.reduce(
-    (acc, row) => {
-      acc[row.status] = Number(row.count);
-      acc.total += Number(row.count);
-      return acc;
-    },
-    { present: 0, absent: 0, late: 0, total: 0 }
-  );
-  const attendancePercentage =
-    attendanceCounts.total === 0
-      ? 0
-      : Math.round((attendanceCounts.present / attendanceCounts.total) * 100);
+    const studentCount = Number(studentResult.rows[0]?.count ?? '0');
+    const attendanceCounts = attendanceResult.rows.reduce(
+      (acc, row) => {
+        acc[row.status] = Number(row.count);
+        acc.total += Number(row.count);
+        return acc;
+      },
+      { present: 0, absent: 0, late: 0, total: 0 }
+    );
+    const attendancePercentage =
+      attendanceCounts.total === 0
+        ? 0
+        : Math.round((attendanceCounts.present / attendanceCounts.total) * 100);
 
-  const billed = feeResult.rows[0]?.billed ?? 0;
-  const paid = feeResult.rows[0]?.paid ?? 0;
+    const billed = feeResult.rows[0]?.billed ?? 0;
+    const paid = feeResult.rows[0]?.paid ?? 0;
 
-  return {
-    class: {
-      id: classId,
-      name: className
-    },
-    studentCount,
-    attendance: {
-      present: attendanceCounts.present,
-      absent: attendanceCounts.absent,
-      late: attendanceCounts.late,
-      total: attendanceCounts.total,
-      percentage: attendancePercentage
-    },
-    grades: gradeResult.rows.map((row) => ({
-      subject: row.subject,
-      entries: Number(row.entries),
-      average: Number.isFinite(row.average) ? Math.round(row.average * 10) / 10 : 0
-    })),
-    fees: {
-      billed,
-      paid,
-      outstanding: billed - paid
-    },
-    generatedAt: new Date().toISOString()
-  };
+    return {
+      class: {
+        id: classId,
+        name: className
+      },
+      studentCount,
+      attendance: {
+        present: attendanceCounts.present,
+        absent: attendanceCounts.absent,
+        late: attendanceCounts.late,
+        total: attendanceCounts.total,
+        percentage: attendancePercentage
+      },
+      grades: gradeResult.rows.map((row) => ({
+        subject: row.subject,
+        entries: Number(row.entries),
+        average: Number.isFinite(row.average) ? Math.round(row.average * 10) / 10 : 0
+      })),
+      fees: {
+        billed,
+        paid,
+        outstanding: billed - paid
+      },
+      generatedAt: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('getTeacherClassReport error:', error);
+    throw new Error(`Failed to generate class report: ${(error as Error).message}`);
+  }
 }
 
 function streamPdf(doc: PdfDoc): Promise<Buffer> {

@@ -57,6 +57,7 @@ router.use(async (req, res, next) => {
     req.teacherRecord = teacher;
     next();
   } catch (error) {
+    console.error('Error in teacher route middleware:', error);
     next(error);
   }
 });
@@ -84,8 +85,11 @@ router.get('/classes', async (req, res, next) => {
 router.get(
   '/classes/:classId/roster',
   verifyTeacherAssignment({ classIdParam: 'classId', allowAdmins: true }),
-  async (req, res, next) => {
+  async (req, res) => {
     try {
+      if (!req.params.classId) {
+        return res.status(400).json({ message: 'classId is required' });
+      }
       const teacher = req.teacherRecord!;
       const roster = await getTeacherClassRoster(
         req.tenantClient!,
@@ -108,7 +112,14 @@ router.get(
           message: 'You are not assigned to this class. Thank you for your understanding.'
         });
       }
-      next(error);
+      console.error('Error in /classes/:classId/roster:', error);
+      // Don't call next(error) if we've already sent a response
+      if (!res.headersSent) {
+        res.status(500).json({
+          message: 'Failed to retrieve class roster',
+          error: (error as Error).message
+        });
+      }
     }
   }
 );
@@ -138,8 +149,11 @@ router.post('/assignments/:assignmentId/drop', async (req, res, next) => {
 router.get(
   '/reports/class/:classId',
   verifyTeacherAssignment({ classIdParam: 'classId', allowAdmins: true }),
-  async (req, res, next) => {
+  async (req, res) => {
     try {
+      if (!req.params.classId) {
+        return res.status(400).json({ message: 'classId is required' });
+      }
       const teacher = req.teacherRecord!;
       const report = await getTeacherClassReport(
         req.tenantClient!,
@@ -161,7 +175,14 @@ router.get(
       }
       res.json(report);
     } catch (error) {
-      next(error);
+      console.error('Error in /reports/class/:classId:', error);
+      // Don't call next(error) if we've already sent a response
+      if (!res.headersSent) {
+        res.status(500).json({
+          message: 'Failed to generate class report',
+          error: (error as Error).message
+        });
+      }
     }
   }
 );

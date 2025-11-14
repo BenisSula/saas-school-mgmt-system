@@ -188,10 +188,11 @@ describe('Teacher dashboard routes', () => {
   });
 
   it('returns roster for assigned class', async () => {
-    const roster = await request(app)
-      .get(`/teacher/classes/${classAId}/roster`)
-      .set(authHeaders)
-      .expect(200);
+    const roster = await request(app).get(`/teacher/classes/${classAId}/roster`).set(authHeaders);
+    if (roster.status !== 200) {
+      console.error('Roster error response:', roster.status, roster.body);
+    }
+    expect(roster.status).toBe(200);
     expect(roster.body).toHaveLength(2);
   });
 
@@ -204,10 +205,11 @@ describe('Teacher dashboard routes', () => {
   });
 
   it('generates class report and pdf', async () => {
-    const report = await request(app)
-      .get(`/teacher/reports/class/${classAId}`)
-      .set(authHeaders)
-      .expect(200);
+    const report = await request(app).get(`/teacher/reports/class/${classAId}`).set(authHeaders);
+    if (report.status !== 200) {
+      console.error('Report error response:', report.status, report.body);
+    }
+    expect(report.status).toBe(200);
     expect(report.body.attendance.total).toBeGreaterThan(0);
 
     const pdf = await request(app)

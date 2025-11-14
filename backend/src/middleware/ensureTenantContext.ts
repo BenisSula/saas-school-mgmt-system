@@ -10,12 +10,6 @@ import { FRIENDLY_TENANT_CONTEXT_ERROR } from '../lib/friendlyMessages';
  */
 export function ensureTenantContext() {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Superadmin might not have tenant context in some cases
-    if (req.user?.role === 'superadmin' && (!req.tenantClient || !req.tenant)) {
-      // Allow superadmin to proceed without tenant context (they can access all tenants)
-      return next();
-    }
-    
     if (!req.tenantClient || !req.tenant) {
       return res.status(500).json({ message: FRIENDLY_TENANT_CONTEXT_ERROR });
     }
