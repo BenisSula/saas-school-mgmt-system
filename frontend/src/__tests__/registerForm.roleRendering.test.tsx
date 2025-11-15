@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RegisterForm } from '../components/auth/RegisterForm';
-import * as AuthContextModule from '../context/AuthContext';
 
 // Mock AuthContext
 vi.mock('../context/AuthContext', () => ({
@@ -11,9 +10,13 @@ vi.mock('../context/AuthContext', () => ({
   })
 }));
 
-// Mock API for TenantSelector
-const mockListSchools = vi.fn();
-const mockLookupTenant = vi.fn();
+// Mock API for TenantSelector - use vi.hoisted to ensure mocks are available when vi.mock is hoisted
+const { mockListSchools, mockLookupTenant } = vi.hoisted(() => {
+  return {
+    mockListSchools: vi.fn(),
+    mockLookupTenant: vi.fn()
+  };
+});
 
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>();

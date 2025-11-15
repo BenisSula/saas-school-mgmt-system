@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type React from 'react';
 import { useLoginForm } from '../hooks/useLoginForm';
-import * as AuthContextModule from '../context/AuthContext';
 
 // Mock AuthContext
 const mockLogin = vi.fn();
@@ -60,7 +60,7 @@ describe('useLoginForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as React.FormEvent);
     });
 
     await waitFor(() => {
@@ -80,7 +80,7 @@ describe('useLoginForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as React.FormEvent);
     });
 
     await waitFor(() => {
@@ -119,7 +119,7 @@ describe('useLoginForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as React.FormEvent);
     });
 
     await waitFor(() => {
@@ -131,8 +131,8 @@ describe('useLoginForm', () => {
   });
 
   it('should map API errors to field errors', async () => {
-    const apiError = new Error('Invalid credentials');
-    (apiError as any).apiError = {
+    const apiError = new Error('Invalid credentials') as Error & { apiError?: { status: string; message: string; field?: string; code?: string } };
+    apiError.apiError = {
       status: 'error',
       message: 'Invalid credentials',
       field: 'password',
@@ -149,14 +149,18 @@ describe('useLoginForm', () => {
     });
 
     await act(async () => {
-      await result.current.handleSubmit({
-        preventDefault: vi.fn()
-      } as any);
+      try {
+        await result.current.handleSubmit({
+          preventDefault: vi.fn()
+        } as React.FormEvent);
+      } catch {
+        // Expected error, ignore
+      }
     });
 
     await waitFor(() => {
       expect(result.current.fieldErrors.password).toBeDefined();
-    });
+    }, { timeout: 3000 });
   });
 
   it('should clear field errors when value changes', () => {

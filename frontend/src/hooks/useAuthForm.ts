@@ -1,17 +1,19 @@
 import { useState, useCallback } from 'react';
+import type React from 'react';
 import { toast } from 'sonner';
 import { mapApiErrorToFieldErrors, isCriticalError } from '../lib/errorMapper';
+import type { ApiErrorResponse } from '../lib/api';
 
-export interface UseAuthFormOptions<T extends Record<string, any>> {
+export interface UseAuthFormOptions<T extends Record<string, unknown>> {
   initialValues?: Partial<T>;
-  onSubmit: (values: T) => Promise<any>;
-  onSuccess?: (result: any) => void;
+  onSubmit: (values: T) => Promise<unknown>;
+  onSuccess?: (result: unknown) => void;
   validate?: (values: T) => Record<string, string> | null;
 }
 
-export interface UseAuthFormReturn<T extends Record<string, any>> {
+export interface UseAuthFormReturn<T extends Record<string, unknown>> {
   values: T;
-  setValue: (field: keyof T, value: any) => void;
+  setValue: (field: keyof T, value: unknown) => void;
   setValues: (values: Partial<T>) => void;
   fieldErrors: Record<string, string>;
   setFieldError: (field: string, error: string | undefined) => void;
@@ -109,7 +111,8 @@ export function useAuthForm<T extends Record<string, any>>(
 
       // Map API errors to field errors
       if (err instanceof Error) {
-        const apiFieldErrors = mapApiErrorToFieldErrors(err as Error & { apiError?: any });
+        const errorWithApi = err as Error & { apiError?: ApiErrorResponse };
+        const apiFieldErrors = mapApiErrorToFieldErrors(errorWithApi);
 
         // Set field-level errors
         if (Object.keys(apiFieldErrors).length > 0) {
@@ -117,7 +120,7 @@ export function useAuthForm<T extends Record<string, any>>(
         }
 
         // Show toast for critical errors
-        if (isCriticalError(err as Error & { apiError?: any })) {
+        if (isCriticalError(errorWithApi)) {
           toast.error(err.message || 'An error occurred. Please try again.');
         }
 
