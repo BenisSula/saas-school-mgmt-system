@@ -4,10 +4,7 @@ import { sanitizeText } from '../lib/sanitize';
 import { useAuthForm } from './useAuthForm';
 import type { AuthResponse, Role } from '../lib/api';
 import type { TenantLookupResult } from '../lib/api';
-import {
-  studentRegistrationSchema,
-  teacherRegistrationSchema
-} from '../lib/validators/authSchema';
+import { studentRegistrationSchema, teacherRegistrationSchema } from '../lib/validators/authSchema';
 import type { ZodError } from 'zod';
 
 // RBAC: Only student and teacher can self-register
@@ -24,7 +21,7 @@ export interface UseRegisterFormOptions {
   onPending?: (auth: AuthResponse) => void;
 }
 
-export interface RegisterFormValues {
+export interface RegisterFormValues extends Record<string, unknown> {
   email: string;
   password: string;
   confirmPassword: string;
@@ -64,8 +61,7 @@ export function useRegisterForm(options: UseRegisterFormOptions = {}) {
 
   // RBAC: Validate role is allowed for self-registration
   const validatedRole = useMemo(
-    () =>
-      ALLOWED_SELF_REGISTER_ROLES.includes(defaultRole) ? defaultRole : 'student',
+    () => (ALLOWED_SELF_REGISTER_ROLES.includes(defaultRole) ? defaultRole : 'student'),
     [defaultRole]
   );
 
@@ -83,72 +79,77 @@ export function useRegisterForm(options: UseRegisterFormOptions = {}) {
   };
 
   const validate = useMemo(
-    () => (values: RegisterFormValues): Record<string, string> | null => {
-      try {
-        let schema;
-        let formData: unknown;
+    () =>
+      (values: RegisterFormValues): Record<string, string> | null => {
+        try {
+          let schema;
+          let formData: unknown;
 
-        const resolvedTenantId = tenantId || defaultTenantId;
+          const resolvedTenantId = tenantId || defaultTenantId;
 
-        if (isStudent) {
-          formData = {
-            email: sanitizeText(values.email).toLowerCase(),
-            password: values.password,
-            confirmPassword: values.confirmPassword,
-            role: 'student',
-            tenantId: resolvedTenantId,
-            fullName: values.fullName,
-            gender: values.gender,
-            dateOfBirth: values.dateOfBirth,
-            parentGuardianName: values.parentGuardianName,
-            parentGuardianContact: values.parentGuardianContact,
-            studentId: values.studentId || undefined,
-            classId: values.classId || undefined,
-            address: values.address
-          };
-          schema = studentRegistrationSchema;
-        } else if (isTeacher) {
-          formData = {
-            email: sanitizeText(values.email).toLowerCase(),
-            password: values.password,
-            confirmPassword: values.confirmPassword,
-            role: 'teacher',
-            tenantId: resolvedTenantId,
-            fullName: values.fullName,
-            gender: values.gender,
-            phone: values.phone,
-            qualifications: values.qualifications,
-            yearsOfExperience: values.yearsOfExperience ? parseInt(values.yearsOfExperience, 10) : 0,
-            subjects: values.subjects,
-            teacherId: values.teacherId || undefined,
-            address: values.address
-          };
-          schema = teacherRegistrationSchema;
-        } else {
-          return { role: 'Invalid role for registration. Only student and teacher can self-register.' };
+          if (isStudent) {
+            formData = {
+              email: sanitizeText(values.email).toLowerCase(),
+              password: values.password,
+              confirmPassword: values.confirmPassword,
+              role: 'student',
+              tenantId: resolvedTenantId,
+              fullName: values.fullName,
+              gender: values.gender,
+              dateOfBirth: values.dateOfBirth,
+              parentGuardianName: values.parentGuardianName,
+              parentGuardianContact: values.parentGuardianContact,
+              studentId: values.studentId || undefined,
+              classId: values.classId || undefined,
+              address: values.address
+            };
+            schema = studentRegistrationSchema;
+          } else if (isTeacher) {
+            formData = {
+              email: sanitizeText(values.email).toLowerCase(),
+              password: values.password,
+              confirmPassword: values.confirmPassword,
+              role: 'teacher',
+              tenantId: resolvedTenantId,
+              fullName: values.fullName,
+              gender: values.gender,
+              phone: values.phone,
+              qualifications: values.qualifications,
+              yearsOfExperience: values.yearsOfExperience
+                ? parseInt(values.yearsOfExperience, 10)
+                : 0,
+              subjects: values.subjects,
+              teacherId: values.teacherId || undefined,
+              address: values.address
+            };
+            schema = teacherRegistrationSchema;
+          } else {
+            return {
+              role: 'Invalid role for registration. Only student and teacher can self-register.'
+            };
+          }
+
+          // Security: Ensure tenantId is provided for student/teacher
+          if ((isStudent || isTeacher) && !resolvedTenantId) {
+            return { tenantId: 'Please select your school/institution to continue registration.' };
+          }
+
+          schema.parse(formData);
+          return null;
+        } catch (err) {
+          if (err && typeof err === 'object' && 'errors' in err) {
+            const zodError = err as unknown as ZodError;
+            const errors: Record<string, string> = {};
+            zodError.issues.forEach((error) => {
+              if (error.path.length > 0) {
+                errors[error.path[0] as string] = error.message;
+              }
+            });
+            return errors;
+          }
+          return { general: 'Validation failed. Please check your input.' };
         }
-
-        // Security: Ensure tenantId is provided for student/teacher
-        if ((isStudent || isTeacher) && !resolvedTenantId) {
-          return { tenantId: 'Please select your school/institution to continue registration.' };
-        }
-
-        schema.parse(formData);
-        return null;
-      } catch (err) {
-        if (err && typeof err === 'object' && 'errors' in err) {
-          const zodError = err as unknown as ZodError;
-          const errors: Record<string, string> = {};
-          zodError.errors.forEach((error) => {
-            if (error.path.length > 0) {
-              errors[error.path[0] as string] = error.message;
-            }
-          });
-          return errors;
-        }
-        return { general: 'Validation failed. Please check your input.' };
-      }
-    },
+      },
     [tenantId, defaultTenantId, isStudent, isTeacher]
   );
 
@@ -243,4 +244,3 @@ export function useRegisterForm(options: UseRegisterFormOptions = {}) {
     handleTenantSelect
   };
 }
-

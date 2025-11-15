@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Button } from '../ui/Button';
@@ -115,9 +115,9 @@ export function AdminUserRegistrationModal({
       return true;
     } catch (err) {
       if (err && typeof err === 'object' && 'errors' in err) {
-        const zodError = err as ZodError;
+        const zodError = err as unknown as ZodError;
         const errors: Record<string, string> = {};
-        zodError.errors.forEach((error) => {
+        zodError.issues.forEach((error) => {
           if (error.path.length > 0) {
             errors[error.path[0] as string] = error.message;
           }
@@ -214,7 +214,8 @@ export function AdminUserRegistrationModal({
             Register New User
           </h2>
           <p className="mt-2 text-sm text-[var(--brand-muted)]">
-            Create a new user account with profile. The user will be immediately active and can sign in.
+            Create a new user account with profile. The user will be immediately active and can sign
+            in.
           </p>
         </header>
 
@@ -272,7 +273,7 @@ export function AdminUserRegistrationModal({
             <AuthInput
               label="Password"
               name="password"
-              isPassword
+              type="password"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -285,7 +286,7 @@ export function AdminUserRegistrationModal({
             <AuthInput
               label="Confirm Password"
               name="confirmPassword"
-              isPassword
+              type="password"
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value);
@@ -337,8 +338,8 @@ export function AdminUserRegistrationModal({
                 <AuthDatePicker
                   label="Date of Birth"
                   value={dateOfBirth}
-                  onChange={(value) => {
-                    setDateOfBirth(value);
+                  onChange={(e) => {
+                    setDateOfBirth(e.target.value);
                     clearFieldError('dateOfBirth');
                   }}
                   error={fieldErrors.dateOfBirth}
@@ -493,4 +494,3 @@ export function AdminUserRegistrationModal({
     </div>
   );
 }
-

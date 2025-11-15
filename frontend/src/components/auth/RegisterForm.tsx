@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AuthResponse, Role } from '../../lib/api';
 import { useRegisterForm } from '../../hooks/useRegisterForm';
 import { AuthInput } from './fields/AuthInput';
@@ -75,7 +75,6 @@ export function RegisterForm({
     setGeneralError,
     submitting,
     handleSubmit,
-    validatedRole,
     isStudent,
     isTeacher,
     tenantId,
@@ -201,7 +200,11 @@ export function RegisterForm({
             required
             error={fieldErrors.dateOfBirth}
             helperText="Enter your date of birth (YYYY-MM-DD)"
-            max={new Date(new Date().setFullYear(new Date().getFullYear() - 5)).toISOString().split('T')[0]}
+            max={
+              new Date(new Date().setFullYear(new Date().getFullYear() - 5))
+                .toISOString()
+                .split('T')[0]
+            }
           />
 
           <AuthInput

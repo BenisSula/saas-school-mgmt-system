@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { api, type TenantUser } from '../lib/api';
+
+// Helper to safely convert unknown to string for display
+const safeString = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  return String(value);
+};
 import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
@@ -64,7 +71,9 @@ function AdminRoleManagementPage() {
         setLoading(true);
         clear();
         const updated = await api.approveUser(user.id);
-        setSuccess(`${user.email} approved. Profile record created. You can now edit and assign classes.`);
+        setSuccess(
+          `${user.email} approved. Profile record created. You can now edit and assign classes.`
+        );
         toast.success(`${user.email} approved. Profile record created.`, {
           description: 'You can now edit the profile to assign classes or make corrections.'
         });
@@ -191,8 +200,8 @@ function AdminRoleManagementPage() {
         <div>
           <h1 className="text-2xl font-semibold">Role management</h1>
           <p className="text-sm text-slate-300">
-            View tenant users, register new users, and adjust their role assignment. Only admins and superadmins can
-            modify roles.
+            View tenant users, register new users, and adjust their role assignment. Only admins and
+            superadmins can modify roles.
           </p>
         </div>
         <div className="flex gap-2">
@@ -213,11 +222,13 @@ function AdminRoleManagementPage() {
             </h2>
             <div className="space-y-2">
               <p className="text-sm text-[var(--brand-muted)]">
-                Review and approve user registrations. Users have filled in their profile details during registration.
-                You can approve to create their profile records, then make any necessary adjustments (class assignments, corrections) afterward.
+                Review and approve user registrations. Users have filled in their profile details
+                during registration. You can approve to create their profile records, then make any
+                necessary adjustments (class assignments, corrections) afterward.
               </p>
               <p className="text-xs text-[var(--brand-muted)] italic">
-                💡 Tip: After approval, you can edit student/teacher profiles to assign classes, correct information, or make other adjustments as needed.
+                💡 Tip: After approval, you can edit student/teacher profiles to assign classes,
+                correct information, or make other adjustments as needed.
               </p>
             </div>
           </div>
@@ -254,18 +265,18 @@ function AdminRoleManagementPage() {
                           Registration Details
                         </p>
                         <div className="space-y-1 text-xs text-[var(--brand-surface-contrast)]">
-                          {user.pending_profile_data.fullName && (
+                          {user.pending_profile_data?.fullName ? (
                             <p>
                               <span className="font-medium">Name:</span>{' '}
-                              {String(user.pending_profile_data.fullName)}
+                              {safeString(user.pending_profile_data.fullName)}
                             </p>
-                          )}
-                          {user.pending_profile_data.gender && (
+                          ) : null}
+                          {user.pending_profile_data?.gender ? (
                             <p>
                               <span className="font-medium">Gender:</span>{' '}
-                              {String(user.pending_profile_data.gender)}
+                              {safeString(user.pending_profile_data.gender)}
                             </p>
-                          )}
+                          ) : null}
                           {user.role === 'student' && (
                             <>
                               {user.pending_profile_data.dateOfBirth && (
@@ -312,12 +323,12 @@ function AdminRoleManagementPage() {
                                 )}
                             </>
                           )}
-                          {user.pending_profile_data.address && (
+                          {user.pending_profile_data?.address ? (
                             <p>
                               <span className="font-medium">Address:</span>{' '}
-                              {String(user.pending_profile_data.address)}
+                              {safeString(user.pending_profile_data.address)}
                             </p>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     )}

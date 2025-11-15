@@ -17,7 +17,7 @@ import { api } from '../../../lib/api';
 
 describe('BrandProvider', () => {
   beforeEach(() => {
-    api.getBranding.mockClear();
+    vi.mocked(api.getBranding).mockClear();
   });
 
   it('loads branding tokens and exposes context', async () => {

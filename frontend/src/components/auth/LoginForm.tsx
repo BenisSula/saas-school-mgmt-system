@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLoginForm } from '../../hooks/useLoginForm';
 import { AuthInput } from './fields/AuthInput';
 import { AuthSubmitButton } from './fields/AuthSubmitButton';
@@ -15,19 +15,12 @@ export interface LoginFormProps {
 
 export function LoginForm({ onSuccess, onSwitchToRegister, initialValues }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-  
-  const {
-    values,
-    setValue,
-    fieldErrors,
-    generalError,
-    setGeneralError,
-    submitting,
-    handleSubmit
-  } = useLoginForm({
-    initialValues,
-    onSuccess
-  });
+
+  const { values, setValue, fieldErrors, generalError, setGeneralError, submitting, handleSubmit } =
+    useLoginForm({
+      initialValues,
+      onSuccess
+    });
 
   useEffect(() => {
     if (initialValues) {

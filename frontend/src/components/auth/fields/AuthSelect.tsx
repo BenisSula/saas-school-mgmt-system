@@ -1,11 +1,13 @@
 import { useId } from 'react';
+import type React from 'react';
 
 export interface AuthSelectOption {
   label: string;
   value: string;
 }
 
-export interface AuthSelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'className'> {
+export interface AuthSelectProps
+  extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'className'> {
   label: string;
   options: AuthSelectOption[];
   error?: string;
@@ -52,7 +54,7 @@ export function AuthSelect({
       <select
         id={selectId}
         aria-describedby={describedBy.join(' ') || undefined}
-        aria-invalid={Boolean(error)}
+        aria-invalid={error ? 'true' : 'false'}
         className={selectClasses}
         {...props}
       >
@@ -71,7 +73,12 @@ export function AuthSelect({
       )}
 
       {error && (
-        <p id={errorId} className="text-xs font-medium text-red-600 dark:text-red-400" role="alert" aria-live="polite">
+        <p
+          id={errorId}
+          className="text-xs font-medium text-red-600 dark:text-red-400"
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </p>
       )}
@@ -80,4 +87,3 @@ export function AuthSelect({
 }
 
 export default AuthSelect;
-

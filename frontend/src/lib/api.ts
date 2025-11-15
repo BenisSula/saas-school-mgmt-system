@@ -108,10 +108,12 @@ export interface ApiErrorResponse {
  * Extracts error information from API response
  * Returns both message and structured error data
  */
-async function extractError(response: Response): Promise<{ message: string; error?: ApiErrorResponse }> {
+async function extractError(
+  response: Response
+): Promise<{ message: string; error?: ApiErrorResponse }> {
   try {
     const payload = await response.json();
-    
+
     // Check for standardized error format
     if (payload?.status === 'error' && typeof payload?.message === 'string') {
       return {
@@ -119,7 +121,7 @@ async function extractError(response: Response): Promise<{ message: string; erro
         error: payload as ApiErrorResponse
       };
     }
-    
+
     // Fallback to legacy format
     if (typeof payload?.message === 'string') {
       return { message: payload.message };
@@ -127,9 +129,9 @@ async function extractError(response: Response): Promise<{ message: string; erro
     if (typeof payload?.error === 'string') {
       return { message: payload.error };
     }
-    
+
     // In dev mode, include more details if available
-    if (process.env.NODE_ENV === 'development' && payload?.stack) {
+    if (import.meta.env.DEV && payload?.stack) {
       console.error('[api] Error response:', payload);
     }
   } catch {
@@ -340,10 +342,10 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
 
   if (!response.ok) {
     const errorInfo = await extractError(response);
-    const error = new Error(errorInfo.message);
+    const error = new Error(errorInfo.message) as Error & { apiError?: ApiErrorResponse };
     // Attach structured error data for field-level error handling
     if (errorInfo.error) {
-      (error as any).apiError = errorInfo.error;
+      error.apiError = errorInfo.error;
     }
     throw error;
   }
@@ -888,7 +890,12 @@ export const api = {
     if (params?.recent !== undefined) queryParams.append('recent', String(params.recent));
     if (params?.limit) queryParams.append('limit', String(params.limit));
     if (params?.offset) queryParams.append('offset', String(params.offset));
-    return apiFetch<{ schools: TenantLookupResult[]; count: number; total?: number; type: 'recent' | 'all' }>(
+    return apiFetch<{
+      schools: TenantLookupResult[];
+      count: number;
+      total?: number;
+      type: 'recent' | 'all';
+    }>(
       `/auth/list-schools?${queryParams.toString()}`,
       {},
       false // Don't retry on lookup failures

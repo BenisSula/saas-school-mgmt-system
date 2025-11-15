@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type React from 'react';
 import { useRegisterForm } from '../hooks/useRegisterForm';
-import * as AuthContextModule from '../context/AuthContext';
 
 // Mock AuthContext
 const mockRegister = vi.fn();
@@ -32,7 +32,7 @@ describe('useRegisterForm', () => {
     mockRegister.mockReset();
     mockListSchools.mockReset();
     mockLookupTenant.mockReset();
-    
+
     // Default mock for listSchools
     mockListSchools.mockResolvedValue({
       schools: [],
@@ -40,7 +40,7 @@ describe('useRegisterForm', () => {
       total: 0,
       type: 'recent' as const
     });
-    
+
     // Default mock for lookupTenant
     mockLookupTenant.mockResolvedValue(null);
   });
@@ -108,12 +108,15 @@ describe('useRegisterForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as unknown as React.FormEvent<HTMLFormElement>);
     });
 
-    await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalled();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockRegister).toHaveBeenCalled();
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('should validate teacher registration with all required fields', async () => {
@@ -160,12 +163,15 @@ describe('useRegisterForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as unknown as React.FormEvent<HTMLFormElement>);
     });
 
-    await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalled();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockRegister).toHaveBeenCalled();
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('should reject registration without tenantId for student', async () => {
@@ -184,7 +190,7 @@ describe('useRegisterForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as unknown as React.FormEvent<HTMLFormElement>);
     });
 
     await waitFor(() => {
@@ -256,12 +262,14 @@ describe('useRegisterForm', () => {
     await act(async () => {
       await result.current.handleSubmit({
         preventDefault: vi.fn()
-      } as any);
+      } as unknown as React.FormEvent<HTMLFormElement>);
     });
 
-    await waitFor(() => {
-      expect(onPending).toHaveBeenCalledWith(mockAuthResponse);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(onPending).toHaveBeenCalledWith(mockAuthResponse);
+      },
+      { timeout: 5000 }
+    );
   });
 });
-

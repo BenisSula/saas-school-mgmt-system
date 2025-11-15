@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
-import * as AuthContextModule from '../context/AuthContext';
 import { toast } from 'sonner';
 
 // Mock toast
@@ -28,8 +27,10 @@ vi.mock('../context/AuthContext', () => ({
 }));
 
 // Mock API for TenantSelector
-const mockListSchools = vi.fn();
-const mockLookupTenant = vi.fn();
+const { mockListSchools, mockLookupTenant } = vi.hoisted(() => ({
+  mockListSchools: vi.fn(),
+  mockLookupTenant: vi.fn()
+}));
 
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>();
@@ -49,10 +50,10 @@ describe('Login/Register Integration Tests', () => {
     mockRegister.mockReset();
     mockListSchools.mockReset();
     mockLookupTenant.mockReset();
-    (toast.error as any).mockReset();
-    (toast.success as any).mockReset();
-    (toast.info as any).mockReset();
-    
+    vi.mocked(toast.error).mockReset();
+    vi.mocked(toast.success).mockReset();
+    vi.mocked(toast.info).mockReset();
+
     // Default mock for listSchools (used by TenantSelector)
     const validTenantId = '123e4567-e89b-12d3-a456-426614174000';
     mockListSchools.mockResolvedValue({
@@ -63,7 +64,7 @@ describe('Login/Register Integration Tests', () => {
       total: 1,
       type: 'recent' as const
     });
-    
+
     // Default mock for lookupTenant
     mockLookupTenant.mockResolvedValue({
       id: validTenantId,
@@ -119,8 +120,10 @@ describe('Login/Register Integration Tests', () => {
     it('should map server errors to field errors', async () => {
       const user = userEvent.setup();
 
-      const apiError = new Error('Invalid credentials');
-      (apiError as any).apiError = {
+      const apiError = new Error('Invalid credentials') as Error & {
+        apiError?: { status: string; message: string; field?: string; code?: string };
+      };
+      apiError.apiError = {
         status: 'error',
         message: 'Invalid credentials',
         field: 'password',
@@ -314,8 +317,10 @@ describe('Login/Register Integration Tests', () => {
     it('should map server error responses to field errors', async () => {
       const user = userEvent.setup();
 
-      const apiError = new Error('Email already exists');
-      (apiError as any).apiError = {
+      const apiError = new Error('Email already exists') as Error & {
+        apiError?: { status: string; message: string; field?: string; code?: string };
+      };
+      apiError.apiError = {
         status: 'error',
         message: 'Email already exists',
         field: 'email',
@@ -345,8 +350,10 @@ describe('Login/Register Integration Tests', () => {
     it('should show toast for critical errors', async () => {
       const user = userEvent.setup();
 
-      const apiError = new Error('Internal server error');
-      (apiError as any).apiError = {
+      const apiError = new Error('Internal server error') as Error & {
+        apiError?: { status: string; message: string; code?: string };
+      };
+      apiError.apiError = {
         status: 'error',
         message: 'Internal server error',
         code: 'INTERNAL_ERROR'
@@ -374,4 +381,3 @@ describe('Login/Register Integration Tests', () => {
     });
   });
 });
-

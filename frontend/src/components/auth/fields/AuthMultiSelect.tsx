@@ -1,4 +1,5 @@
 import { useState, useId, useRef, useEffect } from 'react';
+import type React from 'react';
 import { X, ChevronDown } from 'lucide-react';
 
 export interface AuthMultiSelectOption {
@@ -69,9 +70,7 @@ export function AuthMultiSelect({
     onChange(value.filter((v) => v !== optionValue));
   };
 
-  const selectedLabels = options
-    .filter((opt) => value.includes(opt.value))
-    .map((opt) => opt.label);
+  const selectedLabels = options.filter((opt) => value.includes(opt.value)).map((opt) => opt.label);
 
   const baseClasses =
     'block w-full rounded-lg border bg-[var(--brand-surface)] px-4 py-3 text-base text-[var(--brand-surface-contrast)] shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-0';
@@ -96,8 +95,8 @@ export function AuthMultiSelect({
           id={selectId}
           onClick={() => setIsOpen(!isOpen)}
           aria-describedby={describedBy.join(' ') || undefined}
-          aria-invalid={Boolean(error)}
-          aria-expanded={isOpen}
+          aria-invalid={error ? 'true' : 'false'}
+          aria-expanded={isOpen ? 'true' : 'false'}
           className={`${baseClasses} ${stateClasses} flex items-center justify-between cursor-pointer`}
         >
           <span className="flex-1 text-left">
@@ -172,7 +171,12 @@ export function AuthMultiSelect({
       )}
 
       {error && (
-        <p id={errorId} className="text-xs font-medium text-red-600 dark:text-red-400" role="alert" aria-live="polite">
+        <p
+          id={errorId}
+          className="text-xs font-medium text-red-600 dark:text-red-400"
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </p>
       )}
@@ -181,4 +185,3 @@ export function AuthMultiSelect({
 }
 
 export default AuthMultiSelect;
-

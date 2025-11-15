@@ -17,6 +17,7 @@ import {
   UserCircle
 } from 'lucide-react';
 import type { Role } from './api';
+import { filterSidebarLinksByPermission } from './rbac/filterSidebarLinks';
 
 export interface SidebarLink {
   id: string;
@@ -201,16 +202,44 @@ const superAdminLinks: SidebarLink[] = [
   }
 ];
 
+const hodLinks: SidebarLink[] = [
+  {
+    id: 'hod-overview',
+    label: 'Dashboard',
+    icon: <LayoutDashboard className="h-5 w-5" />,
+    path: '/dashboard/hod/overview'
+  },
+  {
+    id: 'hod-reports',
+    label: 'Reports',
+    icon: <BarChart3 className="h-5 w-5" />,
+    path: '/dashboard/hod/reports'
+  },
+  {
+    id: 'hod-analytics',
+    label: 'Analytics',
+    icon: <LineChart className="h-5 w-5" />,
+    path: '/dashboard/hod/analytics'
+  }
+];
+
 const ROLE_LINKS: RoleLinkMap = {
   superadmin: superAdminLinks,
   admin: adminLinks,
+  hod: hodLinks,
   teacher: teacherLinks,
   student: studentLinks
 };
 
+/**
+ * Get sidebar links for a role, filtered by permissions
+ * Only returns links the user has permission to access
+ */
 export function getSidebarLinksForRole(role: Role | null | undefined): SidebarLink[] {
   if (!role) return [];
-  return ROLE_LINKS[role] ?? [];
+  const links = ROLE_LINKS[role] ?? [];
+  // Filter links based on RBAC permissions
+  return filterSidebarLinksByPermission(links, role);
 }
 
 export function getDefaultDashboardPath(role: Role | null | undefined): string {

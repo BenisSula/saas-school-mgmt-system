@@ -1,8 +1,8 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import type { Role } from '../lib/api';
-import type { Permission } from '../hooks/usePermission';
-import { rolePermissions } from '../config/permissions';
+import type { Role, Permission } from '../config/permissions';
+import { hasPermission } from '../config/permissions';
 
 export interface ProtectedRouteProps {
   allowedRoles?: Role[];
@@ -34,14 +34,13 @@ export function ProtectedRoute({
     }
 
     const role = user.role as Role;
-    const userPermissions = rolePermissions[role] ?? [];
 
     if (requireAllPermissions) {
       // User must have ALL specified permissions
-      return allowedPermissions.every((perm) => userPermissions.includes(perm));
+      return allowedPermissions.every((perm) => hasPermission(role, perm));
     } else {
       // User must have ANY of the specified permissions
-      return allowedPermissions.some((perm) => userPermissions.includes(perm));
+      return allowedPermissions.some((perm) => hasPermission(role, perm));
     }
   }, [allowedPermissions, requireAllPermissions, user]);
 
@@ -75,22 +74,13 @@ export function ProtectedRoute({
 
   // Check role-based access first
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return (
-      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-6 text-sm text-amber-200">
-        You do not have permission to view this page. Switch to an appropriate role.
-      </div>
-    );
+    return <Navigate to="/not-authorized" replace />;
   }
 
   // Check permission-based access (only if roles check passed or no roles specified)
   // If both roles and permissions are specified, user must pass both checks
   if (allowedPermissions && !hasRequiredPermissions) {
-    return (
-      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-6 text-sm text-amber-200">
-        You do not have permission to view this page. Required permissions:{' '}
-        {allowedPermissions.join(', ')}
-      </div>
-    );
+    return <Navigate to="/not-authorized" replace />;
   }
 
   return <>{children}</>;

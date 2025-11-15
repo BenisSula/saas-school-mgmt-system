@@ -15,8 +15,8 @@ export interface SidebarProps {
 }
 
 const sidebarVariants = {
-  expanded: { width: 264 },
-  collapsed: { width: 92 }
+  expanded: { width: 'var(--layout-sidebar-width)' },
+  collapsed: { width: 'var(--layout-sidebar-collapsed-width)' }
 };
 
 const navItemVariants = {
@@ -35,17 +35,25 @@ function SidebarComponent({
   isDesktop
 }: SidebarProps) {
   const shouldCollapse = collapsed && isDesktop;
+  const isExpanded = !collapsed;
 
   return (
     <motion.aside
       className={`${
-        isDesktop ? 'sticky top-20 h-[calc(100vh-5rem)]' : 'fixed inset-y-0 left-0 z-50 h-screen'
-      } flex-shrink-0 overflow-hidden border-r border-[var(--brand-border)] bg-[var(--brand-surface)]/95 shadow-xl backdrop-blur transition-all`}
+        isDesktop
+          ? 'sticky top-[var(--layout-header-height)] h-[calc(100vh-var(--layout-header-height))]'
+          : 'fixed inset-y-0 left-0 z-50 h-screen'
+      } flex-shrink-0 overflow-hidden border-r border-[var(--brand-border)] bg-[var(--brand-surface)]/95 shadow-xl backdrop-blur`}
       aria-hidden={!open && !isDesktop}
       data-collapsed={shouldCollapse}
       animate={shouldCollapse ? 'collapsed' : 'expanded'}
       variants={sidebarVariants}
       initial={false}
+      transition={{
+        type: 'tween',
+        duration: 0.3,
+        ease: [0.4, 0, 0.2, 1]
+      }}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-[var(--brand-border)] px-4 py-3 lg:px-5">
@@ -58,7 +66,7 @@ function SidebarComponent({
               onClick={onCollapsedToggle}
               className="interactive-button inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--brand-surface-contrast)]"
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-expanded={!collapsed}
+              aria-expanded={isExpanded ? 'true' : 'false'}
             >
               {collapsed ? (
                 <ChevronsRight className="h-4 w-4" />
@@ -83,7 +91,7 @@ function SidebarComponent({
           role="navigation"
           aria-label="Sidebar navigation"
         >
-          <ul className="flex flex-col gap-1" role="list">
+          <ul className="flex flex-col gap-1">
             <AnimatePresence initial={false}>
               {links.map((link) => {
                 const isActive = activePath === link.path;
@@ -98,7 +106,6 @@ function SidebarComponent({
                   >
                     <button
                       type="button"
-                      aria-pressed={isActive}
                       aria-current={isActive ? 'page' : undefined}
                       onClick={() => {
                         onNavigate(link.path);

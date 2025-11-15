@@ -30,7 +30,7 @@ export interface UseAuthFormReturn<T extends Record<string, unknown>> {
  * Base hook for authentication forms
  * Provides common form state management, validation, and error handling
  */
-export function useAuthForm<T extends Record<string, any>>(
+export function useAuthForm<T extends Record<string, unknown>>(
   options: UseAuthFormOptions<T>
 ): UseAuthFormReturn<T> {
   const { initialValues = {}, onSubmit, onSuccess, validate } = options;
@@ -40,17 +40,20 @@ export function useAuthForm<T extends Record<string, any>>(
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const setValue = useCallback((field: keyof T, value: any) => {
-    setValuesState((prev) => ({ ...prev, [field]: value }));
-    // Clear field error when user starts typing
-    if (fieldErrors[field as string]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[field as string];
-        return next;
-      });
-    }
-  }, [fieldErrors]);
+  const setValue = useCallback(
+    (field: keyof T, value: unknown) => {
+      setValuesState((prev) => ({ ...prev, [field]: value }));
+      // Clear field error when user starts typing
+      if (fieldErrors[field as string]) {
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next[field as string];
+          return next;
+        });
+      }
+    },
+    [fieldErrors]
+  );
 
   const setValues = useCallback((newValues: Partial<T>) => {
     setValuesState((prev) => ({ ...prev, ...newValues }));
@@ -67,9 +70,12 @@ export function useAuthForm<T extends Record<string, any>>(
     });
   }, []);
 
-  const clearFieldError = useCallback((field: string) => {
-    setFieldError(field, undefined);
-  }, [setFieldError]);
+  const clearFieldError = useCallback(
+    (field: string) => {
+      setFieldError(field, undefined);
+    },
+    [setFieldError]
+  );
 
   const clearAllErrors = useCallback(() => {
     setFieldErrors({});
@@ -82,60 +88,62 @@ export function useAuthForm<T extends Record<string, any>>(
     setSubmitting(false);
   }, [initialValues, clearAllErrors]);
 
-  const handleSubmit = useCallback(async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (submitting) return;
+  const handleSubmit = useCallback(
+    async (event: React.FormEvent): Promise<void> => {
+      event.preventDefault();
+      if (submitting) return;
 
-    // Clear previous errors
-    clearAllErrors();
+      // Clear previous errors
+      clearAllErrors();
 
-    // Run validation if provided
-    if (validate) {
-      const validationErrors = validate(values);
-      if (validationErrors) {
-        setFieldErrors(validationErrors);
-        return;
-      }
-    }
-
-    setSubmitting(true);
-
-    try {
-      const result = await onSubmit(values);
-      if (onSuccess) {
-        onSuccess(result);
-      }
-      return result;
-    } catch (err) {
-      console.error('[useAuthForm] Submit error:', err);
-
-      // Map API errors to field errors
-      if (err instanceof Error) {
-        const errorWithApi = err as Error & { apiError?: ApiErrorResponse };
-        const apiFieldErrors = mapApiErrorToFieldErrors(errorWithApi);
-
-        // Set field-level errors
-        if (Object.keys(apiFieldErrors).length > 0) {
-          setFieldErrors(apiFieldErrors);
+      // Run validation if provided
+      if (validate) {
+        const validationErrors = validate(values);
+        if (validationErrors) {
+          setFieldErrors(validationErrors);
+          return;
         }
-
-        // Show toast for critical errors
-        if (isCriticalError(errorWithApi)) {
-          toast.error(err.message || 'An error occurred. Please try again.');
-        }
-
-        // Set general error message
-        setGeneralError(err.message || 'An error occurred. Please try again.');
-      } else {
-        const message = typeof err === 'string' ? err : 'An error occurred. Please try again.';
-        setGeneralError(message);
-        toast.error(message);
       }
-      throw err;
-    } finally {
-      setSubmitting(false);
-    }
-  }, [values, submitting, validate, onSubmit, onSuccess, clearAllErrors]);
+
+      setSubmitting(true);
+
+      try {
+        const result = await onSubmit(values);
+        if (onSuccess) {
+          onSuccess(result);
+        }
+      } catch (err) {
+        console.error('[useAuthForm] Submit error:', err);
+
+        // Map API errors to field errors
+        if (err instanceof Error) {
+          const errorWithApi = err as Error & { apiError?: ApiErrorResponse };
+          const apiFieldErrors = mapApiErrorToFieldErrors(errorWithApi);
+
+          // Set field-level errors
+          if (Object.keys(apiFieldErrors).length > 0) {
+            setFieldErrors(apiFieldErrors);
+          }
+
+          // Show toast for critical errors
+          if (isCriticalError(errorWithApi)) {
+            toast.error(err.message || 'An error occurred. Please try again.');
+          }
+
+          // Set general error message
+          setGeneralError(err.message || 'An error occurred. Please try again.');
+        } else {
+          const message = typeof err === 'string' ? err : 'An error occurred. Please try again.';
+          setGeneralError(message);
+          toast.error(message);
+        }
+        throw err;
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [values, submitting, validate, onSubmit, onSuccess, clearAllErrors]
+  );
 
   return {
     values,
@@ -152,4 +160,3 @@ export function useAuthForm<T extends Record<string, any>>(
     reset
   };
 }
-

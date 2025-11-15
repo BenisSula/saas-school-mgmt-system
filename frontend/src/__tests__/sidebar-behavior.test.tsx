@@ -39,7 +39,8 @@ describe('Sidebar role links', () => {
           email: 'admin@example.com',
           role: 'admin',
           tenantId: 'tenant',
-          isVerified: true
+          isVerified: true,
+          status: 'active'
         }}
         onLogout={() => {}}
       >
@@ -48,7 +49,7 @@ describe('Sidebar role links', () => {
       ['/dashboard/classes']
     );
 
-    await screen.findByText(/Content/i);
+    await screen.findByText(/Content/i, { selector: 'div' });
     expect(screen.getByRole('button', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'User management' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Classes & subjects' })).toBeInTheDocument();
@@ -68,7 +69,8 @@ describe('Sidebar role links', () => {
           email: 'teacher@example.com',
           role: 'teacher',
           tenantId: 'tenant',
-          isVerified: true
+          isVerified: true,
+          status: 'active'
         }}
         onLogout={() => {}}
       >
@@ -96,7 +98,8 @@ describe('Sidebar role links', () => {
           email: 'student@example.com',
           role: 'student',
           tenantId: 'tenant',
-          isVerified: true
+          isVerified: true,
+          status: 'active'
         }}
         onLogout={() => {}}
       >
@@ -120,7 +123,8 @@ describe('Sidebar role links', () => {
           email: 'owner@example.com',
           role: 'superadmin',
           tenantId: null,
-          isVerified: true
+          isVerified: true,
+          status: 'active'
         }}
         onLogout={() => {}}
       >
@@ -186,7 +190,8 @@ describe('Content area layout', () => {
           email: 'admin@example.com',
           role: 'admin',
           tenantId: 'tenant',
-          isVerified: true
+          isVerified: true,
+          status: 'active'
         }}
         onLogout={() => {}}
       >

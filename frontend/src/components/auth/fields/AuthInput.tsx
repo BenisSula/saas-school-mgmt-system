@@ -1,7 +1,8 @@
 import React, { useId } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
-export interface AuthInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'className'> {
+export interface AuthInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'className'> {
   label: string;
   error?: string;
   helperText?: string;
@@ -64,7 +65,7 @@ export const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
             id={inputId}
             type={inputType}
             aria-describedby={describedBy.join(' ') || undefined}
-            aria-invalid={Boolean(error)}
+            aria-invalid={error ? 'true' : 'false'}
             className={inputClasses}
             {...props}
           />
@@ -109,4 +110,3 @@ export const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
 AuthInput.displayName = 'AuthInput';
 
 export default AuthInput;
-

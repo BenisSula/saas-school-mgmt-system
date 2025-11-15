@@ -1,6 +1,8 @@
 import { useId } from 'react';
+import type React from 'react';
 
-export interface AuthDatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'className'> {
+export interface AuthDatePickerProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type' | 'className'> {
   label: string;
   error?: string;
   helperText?: string;
@@ -46,7 +48,7 @@ export function AuthDatePicker({
         id={inputId}
         type="date"
         aria-describedby={describedBy.join(' ') || undefined}
-        aria-invalid={Boolean(error)}
+        aria-invalid={error ? 'true' : 'false'}
         className={inputClasses}
         {...props}
       />
@@ -58,7 +60,12 @@ export function AuthDatePicker({
       )}
 
       {error && (
-        <p id={errorId} className="text-xs font-medium text-red-600 dark:text-red-400" role="alert" aria-live="polite">
+        <p
+          id={errorId}
+          className="text-xs font-medium text-red-600 dark:text-red-400"
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </p>
       )}
@@ -67,4 +74,3 @@ export function AuthDatePicker({
 }
 
 export default AuthDatePicker;
-

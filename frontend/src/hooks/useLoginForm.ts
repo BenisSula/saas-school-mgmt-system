@@ -11,7 +11,7 @@ export interface UseLoginFormOptions {
   onSuccess?: () => void;
 }
 
-export interface LoginFormValues {
+export interface LoginFormValues extends Record<string, unknown> {
   email: string;
   password: string;
 }
@@ -30,22 +30,23 @@ export function useLoginForm(options: UseLoginFormOptions = {}) {
   );
 
   const validate = useMemo(
-    () => (values: LoginFormValues): Record<string, string> | null => {
-      const errors: Record<string, string> = {};
-      const email = sanitizeText(values.email || '').toLowerCase();
+    () =>
+      (values: LoginFormValues): Record<string, string> | null => {
+        const errors: Record<string, string> = {};
+        const email = sanitizeText(values.email || '').toLowerCase();
 
-      if (!email) {
-        errors.email = 'Please enter your email address.';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errors.email = 'Please enter a valid email address.';
-      }
+        if (!email) {
+          errors.email = 'Please enter your email address.';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          errors.email = 'Please enter a valid email address.';
+        }
 
-      if (!values.password) {
-        errors.password = 'Please enter your password.';
-      }
+        if (!values.password) {
+          errors.password = 'Please enter your password.';
+        }
 
-      return Object.keys(errors).length > 0 ? errors : null;
-    },
+        return Object.keys(errors).length > 0 ? errors : null;
+      },
     []
   );
 
@@ -69,4 +70,3 @@ export function useLoginForm(options: UseLoginFormOptions = {}) {
     trimmedEmail
   };
 }
-

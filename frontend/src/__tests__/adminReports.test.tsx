@@ -3,14 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AdminReportsPage from '../pages/AdminReportsPage';
 
 describe('AdminReportsPage', () => {
-  const fetchMock = vi.fn<
-    Promise<{
-      ok: boolean;
-      status: number;
-      json: () => Promise<unknown>;
-    }>,
-    [string | URL, (globalThis.RequestInit | undefined)?]
-  >();
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({})
+  });
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {

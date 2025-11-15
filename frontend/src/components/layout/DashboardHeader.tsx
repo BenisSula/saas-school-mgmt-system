@@ -2,9 +2,11 @@ import type { AriaAttributes } from 'react';
 import { motion } from 'framer-motion';
 import { Menu } from 'lucide-react';
 import type { AuthUser } from '../../lib/api';
-import { ThemeToggle } from '../ui/ThemeToggle';
+import { ThemeToggleWithTooltip } from '../ui/ThemeToggleWithTooltip';
 import { useBrand } from '../ui/BrandProvider';
 import { AvatarDropdown } from '../ui/AvatarDropdown';
+import { SearchBar } from '../ui/SearchBar';
+import { Notifications } from '../ui/Notifications';
 import { useDashboardRouteMeta } from '../../context/DashboardRouteContext';
 
 export interface DashboardHeaderProps {
@@ -34,7 +36,7 @@ export function DashboardHeader({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 120, damping: 20 }}
     >
-      <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center gap-3 px-3 sm:px-6">
+      <div className="mx-auto flex h-16 w-full items-center gap-3 px-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -67,23 +69,44 @@ export function DashboardHeader({
           </div>
         </div>
 
-        <div className="flex flex-1 justify-center">
-          {title ? (
+        <div className="flex flex-1 items-center justify-center gap-4">
+          <div className="hidden w-full max-w-md md:block">
+            <SearchBar
+              placeholder="Search dashboard..."
+              onSearch={(query) => {
+                // TODO: Implement search functionality
+                console.log('Search:', query);
+              }}
+            />
+          </div>
+          {title && (
             <h1
               id={titleId}
-              className="line-clamp-1 text-center text-sm font-semibold text-[var(--brand-surface-contrast)] sm:text-base md:text-lg"
+              className="line-clamp-1 text-center text-sm font-semibold text-[var(--brand-surface-contrast)] md:hidden lg:text-base"
             >
               {title}
             </h1>
-          ) : (
-            <span className="sr-only" id={titleId}>
+          )}
+          {!title && (
+            <span className="sr-only md:hidden" id={titleId}>
               Dashboard
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          <Notifications
+            notifications={[]}
+            onNotificationClick={(notification) => {
+              // TODO: Implement notification click handler
+              console.log('Notification clicked:', notification);
+            }}
+            onMarkAllRead={() => {
+              // TODO: Implement mark all read
+              console.log('Mark all read');
+            }}
+          />
+          <ThemeToggleWithTooltip />
           <AvatarDropdown user={user} onLogout={onLogout} />
         </div>
       </div>

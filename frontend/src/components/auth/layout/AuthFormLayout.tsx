@@ -28,7 +28,7 @@ export function AuthFormLayout({
   useBrand(); // Ensure theme context is available
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--brand-surface)] px-4 py-12 transition-colors duration-300 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--brand-surface)] px-4 py-8 transition-colors duration-300 sm:px-6 sm:py-12 lg:px-8">
       {/* Theme Toggle - Top Right */}
       <div className="fixed right-4 top-4 z-50 sm:right-6 sm:top-6">
         <ThemeToggle />
@@ -70,4 +70,3 @@ export function AuthFormLayout({
 }
 
 export default AuthFormLayout;
-

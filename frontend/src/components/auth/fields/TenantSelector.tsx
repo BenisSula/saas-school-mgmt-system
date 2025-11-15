@@ -100,7 +100,11 @@ export function TenantSelector({
         else if ('results' in result && Array.isArray(result.results)) {
           setSearchResults(result.results);
           setShowDropdown(result.results.length > 0);
-          setSearchError(result.results.length === 0 ? 'No school found. Please check your registration code or school name.' : null);
+          setSearchError(
+            result.results.length === 0
+              ? 'No school found. Please check your registration code or school name.'
+              : null
+          );
         }
         // Handle single result in response format (has id but might be wrapped)
         else if ('id' in result) {
@@ -130,7 +134,7 @@ export function TenantSelector({
 
   const handleSearchChange = (newQuery: string) => {
     setSearchQuery(newQuery);
-    
+
     // If dropdown mode and query is empty, show initial schools
     if (searchMode === 'dropdown' && !newQuery.trim()) {
       setSearchResults(initialSchools);
@@ -289,7 +293,7 @@ export function TenantSelector({
           }
           className={inputClasses}
           aria-describedby={helperText || error ? 'tenant-selector-helper' : undefined}
-          aria-invalid={Boolean(error)}
+          aria-invalid={error ? 'true' : 'false'}
         />
         {isSearching && (
           <Loader2 className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin text-[var(--brand-muted)]" />
@@ -382,7 +386,11 @@ export function TenantSelector({
 
       {/* Error Messages */}
       {error && (
-        <p className="text-xs font-medium text-red-600 dark:text-red-400" role="alert" aria-live="polite">
+        <p
+          className="text-xs font-medium text-red-600 dark:text-red-400"
+          role="alert"
+          aria-live="polite"
+        >
           {error}
         </p>
       )}
@@ -397,4 +405,3 @@ export function TenantSelector({
 }
 
 export default TenantSelector;
-

@@ -14,9 +14,11 @@ const emailSchema = z.string().email('Please enter a valid email address').toLow
 
 // Common fields
 const fullNameSchema = z.string().min(2, 'Name must be at least 2 characters long').trim();
-const genderSchema = z.enum(['male', 'female', 'other'], {
-  errorMap: () => ({ message: 'Please select a valid gender' })
-});
+const genderSchema = z
+  .enum(['male', 'female', 'other'])
+  .refine((val) => ['male', 'female', 'other'].includes(val), {
+    message: 'Please select a valid gender'
+  });
 const phoneSchema = z
   .string()
   .regex(/^\+?[\d\s-()]+$/, 'Please enter a valid phone number')
@@ -32,10 +34,9 @@ export const baseRegistrationSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   confirmPassword: z.string(),
-  role: z.enum(allowedSelfRegisterRoles, {
-    errorMap: () => ({ 
-      message: 'Invalid role. Only student and teacher can self-register. Admin registration requires creating a new organization.' 
-    })
+  role: z.enum(allowedSelfRegisterRoles).refine((val) => allowedSelfRegisterRoles.includes(val), {
+    message:
+      'Invalid role. Only student and teacher can self-register. Admin registration requires creating a new organization.'
   }),
   tenantId: z.string().uuid().optional(),
   tenantName: z.string().min(3, 'Organization name must be at least 3 characters').optional()
@@ -136,4 +137,3 @@ export type TeacherProfileInput = z.infer<typeof teacherProfileSchema>;
 export type StudentRegistrationInput = z.infer<typeof studentRegistrationSchema>;
 export type TeacherRegistrationInput = z.infer<typeof teacherRegistrationSchema>;
 export type AdminRegistrationInput = z.infer<typeof adminRegistrationSchema>;
-

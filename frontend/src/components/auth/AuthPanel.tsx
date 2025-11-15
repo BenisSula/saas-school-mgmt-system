@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { AuthResponse } from '../../lib/api';
 import { LoginForm, type LoginFormProps } from './LoginForm';
