@@ -57,7 +57,8 @@ describe('Layout shells', () => {
           email: 'admin@example.com',
           role: 'admin',
           tenantId: 'tenant',
-          isVerified: true
+          isVerified: true,
+          status: 'active'
         }}
         onLogout={() => {}}
       >

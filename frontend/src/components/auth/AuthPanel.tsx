@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { AuthResponse } from '../../lib/api';
 import { LoginForm, type LoginFormProps } from './LoginForm';
 import { RegisterForm, type RegisterFormProps } from './RegisterForm';
+import { useBrand } from '../ui/BrandProvider';
 
 export type AuthView = 'login' | 'register';
 
@@ -37,6 +38,7 @@ export function AuthPanel({
   loginFormProps,
   registerFormProps
 }: AuthPanelProps) {
+  useBrand(); // Ensure theme context is available
   const [activeTab, setActiveTab] = useState<AuthView>(mode);
 
   useEffect(() => {
@@ -62,23 +64,23 @@ export function AuthPanel({
       animate="animate"
       exit="exit"
       transition={{ type: 'spring', stiffness: 220, damping: 18 }}
-      className={`w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl sm:p-8 ${className}`}
+      className={`w-full max-w-md rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface)] p-6 shadow-2xl sm:p-8 ${className}`}
     >
       <header className="space-y-2 text-center">
-        <h2 className="font-['Poppins'] text-2xl font-semibold text-[#234E70] sm:text-3xl">
+        <h2 className="font-['Poppins'] text-2xl font-semibold text-[var(--brand-primary)] sm:text-3xl">
           {title}
         </h2>
-        <p className="font-['Roboto'] text-sm text-gray-600">{subtitle}</p>
+        <p className="font-['Roboto'] text-sm text-[var(--brand-muted)]">{subtitle}</p>
       </header>
 
-      <div className="mt-6 flex items-center justify-center gap-1 rounded-full border border-gray-200 bg-gray-100 p-1">
+      <div className="mt-6 flex items-center justify-center gap-1 rounded-full border border-[var(--brand-border)] bg-[var(--brand-surface)]/50 p-1">
         <button
           type="button"
           onClick={() => handleTabChange('login')}
           className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition ${
             activeTab === 'login'
-              ? 'bg-[#234E70] text-white shadow-lg'
-              : 'text-gray-600 hover:text-[#234E70]'
+              ? 'bg-[var(--brand-primary)] text-[var(--brand-primary-contrast)] shadow-lg'
+              : 'text-[var(--brand-muted)] hover:text-[var(--brand-primary)]'
           }`}
         >
           Sign In
@@ -88,8 +90,8 @@ export function AuthPanel({
           onClick={() => handleTabChange('register')}
           className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition ${
             activeTab === 'register'
-              ? 'bg-[#1ABC9C] text-white shadow-lg'
-              : 'text-gray-600 hover:text-[#1ABC9C]'
+              ? 'bg-[var(--brand-accent)] text-[var(--brand-accent-contrast)] shadow-lg'
+              : 'text-[var(--brand-muted)] hover:text-[var(--brand-accent)]'
           }`}
         >
           Register
@@ -122,7 +124,7 @@ export function AuthPanel({
       </div>
 
       {activeTab === 'register' ? (
-        <p className="mt-4 text-center text-xs font-['Roboto'] text-gray-500">
+        <p className="mt-4 text-center text-xs font-['Roboto'] text-[var(--brand-muted)]">
           Student and teacher accounts may require administrator approval before activation.
         </p>
       ) : null}

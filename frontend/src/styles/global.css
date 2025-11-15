@@ -1,9 +1,19 @@
+@import './theme/variables.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    color-scheme: dark;
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+  }
+
+  :root[data-theme='dark'] {
     color-scheme: dark;
   }
 
@@ -27,6 +37,16 @@
 
   .nav-item-button {
     @apply flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)];
+  }
+
+  /* Enhanced focus states for accessibility */
+  .focus-ring {
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)];
+  }
+
+  /* Skip to main content link for screen readers */
+  .skip-to-main {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--brand-primary)] focus:text-[var(--brand-primary-contrast)] focus:rounded-md focus:font-medium;
   }
 }
 

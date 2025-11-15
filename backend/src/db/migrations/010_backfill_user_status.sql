@@ -6,18 +6,14 @@ UPDATE shared.users
 SET status = 'active'
 WHERE role = 'superadmin' AND (status IS NULL OR status = '');
 
--- Set status for admins created by superuser (have created_by set) to active
+-- Set status for existing admins based on is_verified flag
+-- Verified admins are likely already active, unverified are pending
 UPDATE shared.users
-SET status = 'active'
+SET status = CASE
+  WHEN is_verified = TRUE THEN 'active'
+  ELSE 'pending'
+END
 WHERE role = 'admin' 
-  AND created_by IS NOT NULL 
-  AND (status IS NULL OR status = '');
-
--- Set status for admins without created_by to pending (self-registered, needs approval)
-UPDATE shared.users
-SET status = 'pending'
-WHERE role = 'admin' 
-  AND created_by IS NULL 
   AND (status IS NULL OR status = '');
 
 -- Set status for teachers, students, and hods to pending (requires admin approval)

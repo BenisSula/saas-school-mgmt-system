@@ -11,14 +11,11 @@ interface MockUser {
 }
 
 describe('AdminRoleManagementPage', () => {
-  const fetchMock = vi.fn<
-    Promise<{
-      ok: boolean;
-      status: number;
-      json: () => Promise<MockUser | MockUser[]>;
-    }>,
-    [string | URL, (globalThis.RequestInit | undefined)?]
-  >();
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => [] as MockUser[]
+  });
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {

@@ -41,6 +41,7 @@ const AdminClassesSubjectsPage = lazy(() => import('./pages/admin/AdminClassesSu
 const AdminAttendancePage = lazy(() => import('./pages/admin/AdminAttendancePage'));
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage'));
 const StudentDashboardPage = lazy(() => import('./pages/student/StudentDashboardPage'));
+const NotAuthorizedPage = lazy(() => import('./pages/NotAuthorizedPage'));
 
 function App() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -81,6 +82,7 @@ function App() {
             <Route path="register" element={<RegisterPage />} />
           </Route>
         </Route>
+        <Route path="/not-authorized" element={<NotAuthorizedPage />} />
         <Route
           path="/dashboard"
           element={

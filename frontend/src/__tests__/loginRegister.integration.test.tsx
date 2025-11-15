@@ -1,0 +1,383 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { LoginForm } from '../components/auth/LoginForm';
+import { RegisterForm } from '../components/auth/RegisterForm';
+import { toast } from 'sonner';
+
+// Mock toast
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+    info: vi.fn()
+  }
+}));
+
+// Mock AuthContext
+const mockLogin = vi.fn();
+const mockRegister = vi.fn();
+
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({
+    login: mockLogin,
+    register: mockRegister
+  })
+}));
+
+// Mock API for TenantSelector
+const { mockListSchools, mockLookupTenant } = vi.hoisted(() => ({
+  mockListSchools: vi.fn(),
+  mockLookupTenant: vi.fn()
+}));
+
+vi.mock('../lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/api')>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      listSchools: mockListSchools,
+      lookupTenant: mockLookupTenant
+    }
+  };
+});
+
+describe('Login/Register Integration Tests', () => {
+  beforeEach(() => {
+    mockLogin.mockReset();
+    mockRegister.mockReset();
+    mockListSchools.mockReset();
+    mockLookupTenant.mockReset();
+    vi.mocked(toast.error).mockReset();
+    vi.mocked(toast.success).mockReset();
+    vi.mocked(toast.info).mockReset();
+
+    // Default mock for listSchools (used by TenantSelector)
+    const validTenantId = '123e4567-e89b-12d3-a456-426614174000';
+    mockListSchools.mockResolvedValue({
+      schools: [
+        { id: validTenantId, name: 'Test School', domain: null, registrationCode: 'TEST123' }
+      ],
+      count: 1,
+      total: 1,
+      type: 'recent' as const
+    });
+
+    // Default mock for lookupTenant
+    mockLookupTenant.mockResolvedValue({
+      id: validTenantId,
+      name: 'Test School',
+      domain: null,
+      registrationCode: 'TEST123'
+    });
+  });
+
+  describe('Login Flow', () => {
+    it('should successfully login with valid credentials', async () => {
+      const user = userEvent.setup();
+      const onSuccess = vi.fn();
+
+      const mockAuthResponse = {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresIn: '900s',
+        user: {
+          id: '1',
+          email: 'student@example.com',
+          role: 'student' as const,
+          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          isVerified: true,
+          status: 'active' as const
+        }
+      };
+
+      mockLogin.mockResolvedValue(mockAuthResponse);
+
+      render(
+        <MemoryRouter>
+          <LoginForm onSuccess={onSuccess} />
+        </MemoryRouter>
+      );
+
+      await user.type(screen.getByLabelText(/email/i), 'student@example.com');
+      await user.type(screen.getByPlaceholderText(/••••••••/i), 'password123');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith({
+          email: 'student@example.com',
+          password: 'password123'
+        });
+      });
+
+      await waitFor(() => {
+        expect(onSuccess).toHaveBeenCalled();
+      });
+    });
+
+    it('should map server errors to field errors', async () => {
+      const user = userEvent.setup();
+
+      const apiError = new Error('Invalid credentials') as Error & {
+        apiError?: { status: string; message: string; field?: string; code?: string };
+      };
+      apiError.apiError = {
+        status: 'error',
+        message: 'Invalid credentials',
+        field: 'password',
+        code: 'INVALID_CREDENTIALS'
+      };
+
+      mockLogin.mockRejectedValue(apiError);
+
+      render(
+        <MemoryRouter>
+          <LoginForm />
+        </MemoryRouter>
+      );
+
+      await user.type(screen.getByLabelText(/email/i), 'student@example.com');
+      await user.type(screen.getByPlaceholderText(/••••••••/i), 'wrongpassword');
+      await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Register Flow - Student', () => {
+    it('should successfully register a student', async () => {
+      const user = userEvent.setup();
+      const onSuccess = vi.fn();
+
+      const mockAuthResponse = {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresIn: '900s',
+        user: {
+          id: '1',
+          email: 'student@example.com',
+          role: 'student' as const,
+          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          isVerified: false,
+          status: 'pending' as const
+        }
+      };
+
+      mockRegister.mockResolvedValue(mockAuthResponse);
+
+      const validTenantId = '123e4567-e89b-12d3-a456-426614174000';
+      render(
+        <MemoryRouter>
+          <RegisterForm
+            defaultRole="student"
+            defaultTenantId={validTenantId}
+            onSuccess={onSuccess}
+          />
+        </MemoryRouter>
+      );
+
+      // Fill in form fields
+      await user.type(screen.getByLabelText(/full name/i), 'John Doe');
+      await user.type(screen.getByLabelText(/work email/i), 'student@example.com');
+      await user.type(screen.getByPlaceholderText(/create a secure password/i), 'StrongPass123!');
+      await user.type(screen.getByPlaceholderText(/re-enter your password/i), 'StrongPass123!');
+      await user.selectOptions(screen.getByLabelText(/gender/i), 'male');
+      await user.type(screen.getByLabelText(/date of birth/i), '2010-01-01');
+      await user.type(screen.getByLabelText(/parent\/guardian name/i), 'Parent Name');
+      await user.type(screen.getByLabelText(/parent\/guardian contact/i), '+1234567890');
+      await user.type(screen.getByLabelText(/class \/ grade/i), 'Grade 10');
+      await user.type(screen.getByLabelText(/address/i), '123 Main St');
+
+      await user.click(screen.getByRole('button', { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(mockRegister).toHaveBeenCalled();
+      });
+
+      const registerCall = mockRegister.mock.calls[0][0];
+      expect(registerCall.email).toBe('student@example.com');
+      expect(registerCall.role).toBe('student');
+      expect(registerCall.tenantId).toBe(validTenantId);
+      expect(registerCall.profile?.fullName).toBe('John Doe');
+    });
+
+    it('should show pending message for student registration', async () => {
+      const user = userEvent.setup();
+      const onPending = vi.fn();
+
+      const mockAuthResponse = {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresIn: '900s',
+        user: {
+          id: '1',
+          email: 'student@example.com',
+          role: 'student' as const,
+          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          isVerified: false,
+          status: 'pending' as const
+        }
+      };
+
+      mockRegister.mockResolvedValue(mockAuthResponse);
+
+      const validTenantId = '223e4567-e89b-12d3-a456-426614174001';
+      render(
+        <MemoryRouter>
+          <RegisterForm
+            defaultRole="student"
+            defaultTenantId={validTenantId}
+            onPending={onPending}
+          />
+        </MemoryRouter>
+      );
+
+      // Fill minimal required fields
+      await user.type(screen.getByLabelText(/full name/i), 'John Doe');
+      await user.type(screen.getByLabelText(/work email/i), 'student@example.com');
+      await user.type(screen.getByPlaceholderText(/create a secure password/i), 'StrongPass123!');
+      await user.type(screen.getByPlaceholderText(/re-enter your password/i), 'StrongPass123!');
+      await user.selectOptions(screen.getByLabelText(/gender/i), 'male');
+      await user.type(screen.getByLabelText(/date of birth/i), '2010-01-01');
+      await user.type(screen.getByLabelText(/parent\/guardian name/i), 'Parent');
+      await user.type(screen.getByLabelText(/parent\/guardian contact/i), '+1234567890');
+      await user.type(screen.getByLabelText(/class \/ grade/i), 'Grade 10');
+      await user.type(screen.getByLabelText(/address/i), '123 Main St');
+
+      await user.click(screen.getByRole('button', { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(onPending).toHaveBeenCalledWith(mockAuthResponse);
+      });
+    });
+  });
+
+  describe('Register Flow - Teacher', () => {
+    it('should successfully register a teacher', async () => {
+      const user = userEvent.setup();
+      const onSuccess = vi.fn();
+
+      const mockAuthResponse = {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresIn: '900s',
+        user: {
+          id: '2',
+          email: 'teacher@example.com',
+          role: 'teacher' as const,
+          tenantId: '123e4567-e89b-12d3-a456-426614174000',
+          isVerified: false,
+          status: 'pending' as const
+        }
+      };
+
+      mockRegister.mockResolvedValue(mockAuthResponse);
+
+      const validTenantId = '323e4567-e89b-12d3-a456-426614174002';
+      render(
+        <MemoryRouter>
+          <RegisterForm
+            defaultRole="teacher"
+            defaultTenantId={validTenantId}
+            onSuccess={onSuccess}
+          />
+        </MemoryRouter>
+      );
+
+      // Fill in form fields
+      await user.type(screen.getByLabelText(/full name/i), 'Jane Smith');
+      await user.type(screen.getByLabelText(/work email/i), 'teacher@example.com');
+      await user.type(screen.getByPlaceholderText(/create a secure password/i), 'StrongPass123!');
+      await user.type(screen.getByPlaceholderText(/re-enter your password/i), 'StrongPass123!');
+      await user.selectOptions(screen.getByLabelText(/gender/i), 'female');
+      await user.type(screen.getByLabelText(/phone number/i), '+1234567890');
+      await user.type(screen.getByLabelText(/qualifications/i), 'B.Ed, M.Sc');
+      await user.type(screen.getByLabelText(/years of experience/i), '5');
+      await user.type(screen.getByLabelText(/address/i), '456 Oak Ave');
+
+      await user.click(screen.getByRole('button', { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(mockRegister).toHaveBeenCalled();
+      });
+
+      const registerCall = mockRegister.mock.calls[0][0];
+      expect(registerCall.email).toBe('teacher@example.com');
+      expect(registerCall.role).toBe('teacher');
+      expect(registerCall.tenantId).toBe(validTenantId);
+      expect(registerCall.profile?.fullName).toBe('Jane Smith');
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should map server error responses to field errors', async () => {
+      const user = userEvent.setup();
+
+      const apiError = new Error('Email already exists') as Error & {
+        apiError?: { status: string; message: string; field?: string; code?: string };
+      };
+      apiError.apiError = {
+        status: 'error',
+        message: 'Email already exists',
+        field: 'email',
+        code: 'DUPLICATE_EMAIL'
+      };
+
+      mockRegister.mockRejectedValue(apiError);
+
+      const validTenantId = '623e4567-e89b-12d3-a456-426614174005';
+      render(
+        <MemoryRouter>
+          <RegisterForm defaultRole="student" defaultTenantId={validTenantId} />
+        </MemoryRouter>
+      );
+
+      await user.type(screen.getByLabelText(/work email/i), 'existing@example.com');
+      await user.type(screen.getByPlaceholderText(/create a secure password/i), 'StrongPass123!');
+      await user.type(screen.getByPlaceholderText(/re-enter your password/i), 'StrongPass123!');
+
+      await user.click(screen.getByRole('button', { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/email already exists/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should show toast for critical errors', async () => {
+      const user = userEvent.setup();
+
+      const apiError = new Error('Internal server error') as Error & {
+        apiError?: { status: string; message: string; code?: string };
+      };
+      apiError.apiError = {
+        status: 'error',
+        message: 'Internal server error',
+        code: 'INTERNAL_ERROR'
+      };
+
+      mockRegister.mockRejectedValue(apiError);
+
+      const validTenantId = '723e4567-e89b-12d3-a456-426614174006';
+      render(
+        <MemoryRouter>
+          <RegisterForm defaultRole="student" defaultTenantId={validTenantId} />
+        </MemoryRouter>
+      );
+
+      await user.type(screen.getByLabelText(/full name/i), 'John Doe');
+      await user.type(screen.getByLabelText(/work email/i), 'test@example.com');
+      await user.type(screen.getByPlaceholderText(/create a secure password/i), 'StrongPass123!');
+      await user.type(screen.getByPlaceholderText(/re-enter your password/i), 'StrongPass123!');
+
+      await user.click(screen.getByRole('button', { name: /create account/i }));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled();
+      });
+    });
+  });
+});

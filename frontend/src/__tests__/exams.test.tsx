@@ -16,7 +16,7 @@ describe('Exam pages', () => {
     vi.spyOn(api.teacher, 'listClasses').mockResolvedValue([]);
     vi.spyOn(api.teacher, 'getClassRoster').mockResolvedValue([]);
     vi.spyOn(api, 'getGradeReport').mockResolvedValue([]);
-    vi.spyOn(api, 'bulkUpsertGrades').mockResolvedValue(undefined);
+    vi.spyOn(api, 'bulkUpsertGrades').mockResolvedValue({ saved: 0 });
   });
 
   afterEach(() => {

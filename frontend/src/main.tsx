@@ -5,7 +5,11 @@ import App from './App';
 import { Toaster } from 'sonner';
 import { BrandProvider } from './components/ui/BrandProvider';
 import { AuthProvider } from './context/AuthContext';
+import { initializeContrastMode } from './lib/theme/highContrast';
 import './styles/global.css';
+
+// Initialize high contrast mode
+initializeContrastMode();
 
 const rootElement = document.getElementById('root');
 

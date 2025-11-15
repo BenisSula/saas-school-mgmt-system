@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { AuthResponse } from '../../lib/api';
-import { AuthPanel } from '../../components/auth/AuthPanel';
+import { AuthFormLayout } from '../../components/auth/layout/AuthFormLayout';
+import { RegisterForm } from '../../components/auth/RegisterForm';
 import { getDefaultDashboardPath } from '../../lib/roleLinks';
 
 export function RegisterPage() {
@@ -16,23 +17,28 @@ export function RegisterPage() {
     }
   };
 
+  const handlePending = () => {
+    toast.info('Account created and pending admin approval. We will notify you once activated.');
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 py-12">
-      <AuthPanel
-        mode="register"
-        onModeChange={(next) => {
-          if (next === 'login') {
-            navigate('/auth/login');
-          }
+    <AuthFormLayout
+      title="Create your account"
+      subtitle="Join the platform to manage academics, attendance, and data-driven insights."
+      footer={
+        <p className="text-center text-xs text-[var(--brand-muted)]">
+          Student and teacher accounts may require administrator approval before activation.
+        </p>
+      }
+    >
+      <RegisterForm
+        onPending={handlePending}
+        onSuccess={handleSuccess}
+        onSwitchToLogin={() => {
+          navigate('/auth/login');
         }}
-        onRegisterPending={() => {
-          toast.info(
-            'Account created and pending admin approval. We will notify you once activated.'
-          );
-        }}
-        onRegisterSuccess={handleSuccess}
       />
-    </div>
+    </AuthFormLayout>
   );
 }
 

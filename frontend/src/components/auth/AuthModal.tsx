@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -93,7 +93,7 @@ export function AuthModal({ isOpen, onClose, mode, setMode }: AuthModalProps) {
     <AnimatePresence>
       {isOpen ? (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 py-8"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--brand-surface-contrast)]/60 dark:bg-black/60 backdrop-blur-sm px-4 py-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -103,7 +103,7 @@ export function AuthModal({ isOpen, onClose, mode, setMode }: AuthModalProps) {
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl sm:p-8"
+            className="relative w-full max-w-md rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface)] p-6 shadow-2xl sm:p-8"
             initial={{ scale: 0.9, opacity: 0, y: 16 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 16 }}

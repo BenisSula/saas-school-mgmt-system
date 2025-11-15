@@ -55,47 +55,71 @@ export async function recordLoginEvent(
   if (!refreshToken) {
     return;
   }
-  const pool = getPool();
-  const refreshTokenHash = hashTokenValue(refreshToken);
-  const sessionId = crypto.randomUUID();
-  const { ip, userAgent } = normaliseContext(context);
+  
+  try {
+    const pool = getPool();
+    const refreshTokenHash = hashTokenValue(refreshToken);
+    const sessionId = crypto.randomUUID();
+    const { ip, userAgent } = normaliseContext(context);
 
-  await pool.query(
-    `
-      INSERT INTO shared.user_sessions (
-        id,
-        user_id,
-        refresh_token_hash,
-        login_at,
-        login_ip,
-        login_user_agent,
-        logout_at,
-        logout_ip,
-        logout_user_agent
+    // Check if user_sessions table exists before inserting
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'shared' 
+        AND table_name = 'user_sessions'
       )
-      VALUES ($1, $2, $3, NOW(), $4, $5, NULL, NULL, NULL)
-      ON CONFLICT (refresh_token_hash) DO UPDATE
-        SET user_id = EXCLUDED.user_id,
-            login_at = NOW(),
-            login_ip = EXCLUDED.login_ip,
-            login_user_agent = EXCLUDED.login_user_agent,
-            logout_at = NULL,
-            logout_ip = NULL,
-            logout_user_agent = NULL
-    `,
-    [sessionId, userId, refreshTokenHash, ip, userAgent]
-  );
-
-  await recordSharedAuditLog({
-    userId,
-    action: 'LOGIN',
-    entityType: 'USER_SESSION',
-    entityId: sessionId,
-    details: {
-      ip,
-      userAgent
+    `);
+    
+    if (tableCheck.rows[0]?.exists) {
+      await pool.query(
+        `
+          INSERT INTO shared.user_sessions (
+            id,
+            user_id,
+            refresh_token_hash,
+            login_at,
+            login_ip,
+            login_user_agent,
+            logout_at,
+            logout_ip,
+            logout_user_agent
+          )
+          VALUES ($1, $2, $3, NOW(), $4, $5, NULL, NULL, NULL)
+          ON CONFLICT (refresh_token_hash) DO UPDATE
+            SET user_id = EXCLUDED.user_id,
+                login_at = NOW(),
+                login_ip = EXCLUDED.login_ip,
+                login_user_agent = EXCLUDED.login_user_agent,
+                logout_at = NULL,
+                logout_ip = NULL,
+                logout_user_agent = NULL
+        `,
+        [sessionId, userId, refreshTokenHash, ip, userAgent]
+      );
     }
-  });
+
+    // Record audit log - don't fail if this fails
+    try {
+      await recordSharedAuditLog({
+        userId,
+        action: 'LOGIN',
+        entityType: 'USER_SESSION',
+        entityId: sessionId,
+        details: {
+          ip,
+          userAgent
+        }
+      });
+    } catch (auditError) {
+      console.error('[platformMonitoring] Failed to record audit log:', auditError);
+      // Don't throw - audit logging is non-critical
+    }
+  } catch (error) {
+    // Log error but don't throw - login event recording is non-critical
+    console.error('[platformMonitoring] Failed to record login event:', error);
+    // Don't rethrow - we don't want to fail login if session tracking fails
+  }
 }
 
 export async function recordLogoutEvent(

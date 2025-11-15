@@ -2,10 +2,19 @@ import app from './app';
 import { getPool } from './db/connection';
 import { runMigrations } from './db/runMigrations';
 import { seedDemoTenant } from './seed/demoTenant';
+import { validateRequiredEnvVars } from './lib/envValidation';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
 async function startServer(): Promise<void> {
+  // Validate required environment variables (especially JWT secrets)
+  try {
+    validateRequiredEnvVars();
+  } catch (error) {
+    console.error('❌ Environment validation failed:', (error as Error).message);
+    process.exit(1);
+  }
+
   const pool = getPool();
 
   try {
