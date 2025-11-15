@@ -18,8 +18,13 @@ import {
   rotateSessionToken,
   SessionContext
 } from './platformMonitoringService';
-import { createTenant as createTenantSchema, createSchemaSlug } from '../db/tenantManager';
-import { createUser } from './userService';
+import {
+  createSchemaSlug,
+  runTenantMigrations,
+  seedTenant
+} from '../db/tenantManager';
+import { registerUser, type UserRegistrationInput } from './userRegistrationService';
+import { validateSignupInput, normalizeSignupPayload } from './authValidation';
 
 const PASSWORD_RESET_TTL = Number(process.env.PASSWORD_RESET_TTL ?? 60 * 30); // 30 minutes
 const EMAIL_VERIFICATION_TTL = Number(process.env.EMAIL_VERIFICATION_TTL ?? 60 * 60 * 24); // 24 hours
@@ -30,6 +35,24 @@ export interface SignUpInput {
   role: Role;
   tenantId?: string;
   tenantName?: string;
+  profile?: {
+    // Common fields
+    fullName?: string;
+    gender?: 'male' | 'female' | 'other';
+    address?: string;
+    // Student-specific fields
+    dateOfBirth?: string;
+    parentGuardianName?: string;
+    parentGuardianContact?: string;
+    studentId?: string;
+    classId?: string;
+    // Teacher-specific fields
+    phone?: string;
+    qualifications?: string;
+    yearsOfExperience?: number;
+    subjects?: string[];
+    teacherId?: string;
+  };
 }
 
 export interface LoginInput {
@@ -58,12 +81,7 @@ interface DbUserRow {
   tenant_id: string | null;
   is_verified: boolean;
   password_hash?: string;
-  status?: string;
-}
-
-async function getDbPool(): Promise<Pool> {
-  const pool = getPool();
-  return pool;
+  status?: string | null; // May be null if migration hasn't run
 }
 
 async function findTenantById(pool: Pool, tenantId: string) {
@@ -86,84 +104,108 @@ function buildTokenPayload(user: DbUserRow): TokenPayload {
 }
 
 export async function signUp(input: SignUpInput): Promise<AuthResponse> {
-  const pool = await getDbPool();
-  const normalizedEmail = input.email.toLowerCase();
+  const pool = getPool();
 
-  const existing = await findUserByEmail(pool, normalizedEmail);
+  // Validate and normalize input (this will throw ValidationError if invalid)
+  const validatedInput = validateSignupInput(input);
+  const normalizedInput = normalizeSignupPayload(validatedInput);
+
+  // Check for duplicate email
+  const existing = await findUserByEmail(pool, normalizedInput.email);
   if (existing) {
-    throw new Error('User already exists');
+    const error = new Error('User with this email already exists');
+    (error as any).code = 'DUPLICATE_EMAIL';
+    throw error;
   }
 
   let resolvedTenantId: string | null = null;
 
-  if (input.role === 'superadmin') {
-    resolvedTenantId = null;
-  } else if (input.tenantId) {
-    const tenant = await findTenantById(pool, input.tenantId);
+  // Resolve tenant ID based on role and input
+  if (normalizedInput.tenantId) {
+    const tenant = await findTenantById(pool, normalizedInput.tenantId);
     if (!tenant) {
       throw new Error('Tenant not found');
     }
     resolvedTenantId = tenant.id;
-  } else if (input.role === 'admin' && input.tenantName) {
-    const tenantName = input.tenantName.trim();
-    if (!tenantName) {
-      throw new Error('Tenant name is required for admin registration without tenant ID');
-    }
+  } else if (normalizedInput.role === 'admin' && normalizedInput.tenantName) {
+    // Admin creating new tenant - wrap in transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const schemaName = createSchemaSlug(tenantName);
-    const tenant = await createTenantSchema(
-      {
-        name: tenantName,
-        schemaName,
-        subscriptionType: 'trial',
-        status: 'active',
-        billingEmail: normalizedEmail
-      },
-      pool
-    );
-    resolvedTenantId = tenant.id;
-  } else if (input.role === 'admin' && !input.tenantId) {
-    throw new Error('Either tenantId or tenantName is required for admin registration');
-  } else if (!input.tenantId) {
+      const schemaName = createSchemaSlug(normalizedInput.tenantName);
+      
+      // Create schema within transaction
+      await client.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
+      
+      // Run tenant migrations and seed (these use their own connections, but schema exists)
+      await runTenantMigrations(pool, schemaName);
+      await seedTenant(pool, schemaName);
+      
+      // Create tenant record within transaction using the client
+      const tenantId = crypto.randomUUID();
+      const tenantResult = await client.query(
+        `
+          INSERT INTO shared.tenants (id, name, domain, schema_name, subscription_type, status, billing_email)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id
+        `,
+        [
+          tenantId,
+          normalizedInput.tenantName,
+          null, // domain
+          schemaName,
+          'trial',
+          'active',
+          normalizedInput.email
+        ]
+      );
+      resolvedTenantId = tenantResult.rows[0].id;
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } else if (normalizedInput.role !== 'admin') {
+    // Student and teacher must have tenantId (validated above, but double-check)
     throw new Error('tenantId is required for non-admin roles');
-  } else {
-    const tenant = await findTenantById(pool, input.tenantId);
-    if (!tenant) {
-      throw new Error('Tenant not found');
+  }
+
+  // Use unified registration service for self-registration
+  const registrationInput: UserRegistrationInput = {
+    email: normalizedInput.email,
+    password: normalizedInput.password,
+    role: normalizedInput.role as 'student' | 'teacher' | 'admin',
+    tenantId: resolvedTenantId || undefined,
+    tenantName: normalizedInput.tenantName,
+    // Profile data from input.profile
+    ...(normalizedInput.profile || {})
+  };
+
+  // Determine if user should be immediately active
+  const immediateActivation: boolean = normalizedInput.role === 'admin' && !!normalizedInput.tenantName;
+
+  const registrationResult = await registerUser(
+    resolvedTenantId,
+    null, // No tenantClient for self-registration (profile created on approval)
+    null, // No schema for self-registration
+    registrationInput,
+    {
+      immediateActivation,
+      createProfileImmediately: false // Profile created when admin approves
     }
-    resolvedTenantId = tenant.id;
-  }
-
-  // Determine user status based on role and context
-  let userStatus: 'pending' | 'active' = 'pending';
-  if (input.role === 'superadmin') {
-    userStatus = 'active';
-  } else if (input.role === 'admin' && input.tenantName) {
-    // Admin creating new tenant is automatically active
-    userStatus = 'active';
-  } else if (input.role === 'admin' && input.tenantId) {
-    // Admin joining existing tenant needs approval
-    userStatus = 'pending';
-  }
-  // teacher, student, hod default to 'pending' (requires admin approval)
-
-  // Use centralized user creation function
-  const createdUser = await createUser(pool, {
-    email: normalizedEmail,
-    password: input.password,
-    role: input.role,
-    tenantId: resolvedTenantId,
-    status: userStatus,
-    isVerified: input.role === 'superadmin' || input.role === 'admin'
-  });
+  );
 
   const user: DbUserRow = {
-    id: createdUser.id,
-    email: createdUser.email,
-    role: createdUser.role,
-    tenant_id: createdUser.tenant_id,
-    is_verified: createdUser.is_verified,
-    status: createdUser.status
+    id: registrationResult.userId,
+    email: registrationResult.email,
+    role: registrationResult.role,
+    tenant_id: resolvedTenantId,
+    is_verified: registrationResult.isVerified,
+    status: registrationResult.status
   };
 
   const payload = buildTokenPayload(user);
@@ -189,45 +231,108 @@ export async function signUp(input: SignUpInput): Promise<AuthResponse> {
 }
 
 export async function login(input: LoginInput, context?: SessionContext): Promise<AuthResponse> {
-  const pool = await getDbPool();
-  const normalizedEmail = input.email.toLowerCase();
-  const user = await findUserByEmail(pool, normalizedEmail);
-
-  if (!user || !user.password_hash) {
-    throw new Error('Invalid credentials');
-  }
-
-  const passwordValid = await argon2.verify(user.password_hash, input.password);
-  if (!passwordValid) {
-    throw new Error('Invalid credentials');
-  }
-
-  const payload = buildTokenPayload(user);
-  const accessToken = generateAccessToken(payload);
-  const { token: refreshToken, expiresAt } = generateRefreshToken(payload);
-  await storeRefreshToken(pool, user.id, refreshToken, expiresAt);
-
-  const response: AuthResponse = {
-    accessToken,
-    refreshToken,
-    expiresIn: process.env.ACCESS_TOKEN_TTL ?? '900s',
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      tenantId: user.tenant_id,
-      isVerified: user.is_verified,
-      status: (user.status as 'pending' | 'active' | 'suspended' | 'rejected') ?? 'pending'
+  try {
+    const pool = getPool();
+    const normalizedEmail = input.email.toLowerCase();
+    
+    let user: DbUserRow | undefined;
+    try {
+      user = await findUserByEmail(pool, normalizedEmail);
+    } catch (dbError) {
+      console.error('[auth] Database error finding user:', dbError);
+      throw new Error('Database error during login');
     }
-  };
 
-  await recordLoginEvent(user.id, refreshToken, context);
+    if (!user || !user.password_hash) {
+      throw new Error('Invalid credentials');
+    }
 
-  return response;
+    let passwordValid: boolean;
+    try {
+      passwordValid = await argon2.verify(user.password_hash, input.password);
+    } catch (verifyError) {
+      console.error('[auth] Password verification error:', verifyError);
+      throw new Error('Invalid credentials');
+    }
+    
+    if (!passwordValid) {
+      throw new Error('Invalid credentials');
+    }
+
+    let payload: TokenPayload;
+    let accessToken: string;
+    let refreshToken: string;
+    let expiresAt: Date;
+    
+    try {
+      payload = buildTokenPayload(user);
+      accessToken = generateAccessToken(payload);
+      const refreshResult = generateRefreshToken(payload);
+      refreshToken = refreshResult.token;
+      expiresAt = refreshResult.expiresAt;
+    } catch (tokenError) {
+      console.error('[auth] Token generation error:', tokenError);
+      throw new Error('Failed to generate authentication tokens');
+    }
+
+    try {
+      await storeRefreshToken(pool, user.id, refreshToken, expiresAt);
+    } catch (storeError) {
+      console.error('[auth] Failed to store refresh token:', storeError);
+      // Don't fail login if refresh token storage fails - user can still login
+    }
+
+    // Safely get status - handle case where column might not exist
+    let userStatus: 'pending' | 'active' | 'suspended' | 'rejected' = 'pending';
+    if (user.status) {
+      userStatus = user.status as 'pending' | 'active' | 'suspended' | 'rejected';
+    } else {
+      // If status column doesn't exist or is null, default to 'pending'
+      // This handles cases where migrations haven't run yet
+      console.warn(`[auth] User ${user.id} has no status, defaulting to 'pending'`);
+    }
+
+    const response: AuthResponse = {
+      accessToken,
+      refreshToken,
+      expiresIn: process.env.ACCESS_TOKEN_TTL ?? '900s',
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenant_id,
+        isVerified: user.is_verified,
+        status: userStatus
+      }
+    };
+
+    // Record login event - don't fail login if this fails
+    try {
+      await recordLoginEvent(user.id, refreshToken, context);
+    } catch (error) {
+      // Log error but don't fail the login
+      console.error('[auth] Failed to record login event:', error);
+    }
+
+    return response;
+  } catch (error) {
+    // Re-throw known errors
+    if (error instanceof Error && (
+      error.message.includes('Invalid credentials') ||
+      error.message.includes('Database error') ||
+      error.message.includes('Failed to generate')
+    )) {
+      throw error;
+    }
+    
+    // Log unexpected errors
+    console.error('[auth] Unexpected login error:', error);
+    throw new Error('An unexpected error occurred during login');
+  }
 }
 
 export async function refreshToken(token: string, context?: SessionContext): Promise<AuthResponse> {
-  const pool = await getDbPool();
+  const pool = getPool();
   const tokenInfo = await verifyRefreshToken(pool, token);
 
   const userResult = await pool.query(
@@ -269,13 +374,13 @@ export async function logout(
   refreshTokenValue: string,
   context?: SessionContext
 ): Promise<void> {
-  const pool = await getDbPool();
+  const pool = getPool();
   await revokeRefreshToken(pool, refreshTokenValue);
   await recordLogoutEvent(userId, refreshTokenValue, context);
 }
 
 export async function requestPasswordReset(email: string): Promise<{ token: string }> {
-  const pool = await getDbPool();
+  const pool = getPool();
   const normalizedEmail = email.toLowerCase();
   const user = await findUserByEmail(pool, normalizedEmail);
 
@@ -302,7 +407,7 @@ export async function requestPasswordReset(email: string): Promise<{ token: stri
 }
 
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
-  const pool = await getDbPool();
+  const pool = getPool();
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
   const result = await pool.query(
@@ -353,7 +458,7 @@ export async function createEmailVerificationToken(
 }
 
 export async function verifyEmail(token: string): Promise<void> {
-  const pool = await getDbPool();
+  const pool = getPool();
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
   const result = await pool.query(
@@ -383,7 +488,7 @@ export async function createTenant(input: {
   domain?: string;
   schemaName: string;
 }): Promise<{ id: string }> {
-  const pool = await getDbPool();
+  const pool = getPool();
   await runMigrations(pool);
 
   const result = await pool.query(
@@ -399,6 +504,6 @@ export async function createTenant(input: {
 }
 
 export async function requestEmailVerification(userId: string, email: string): Promise<void> {
-  const pool = await getDbPool();
+  const pool = getPool();
   await createEmailVerificationToken(pool, userId, email.toLowerCase());
 }

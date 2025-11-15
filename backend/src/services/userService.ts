@@ -15,6 +15,7 @@ export interface TenantUser {
   status: string | null;
   created_at: string;
   additional_roles?: Array<{ role: string; metadata?: Record<string, unknown> }>;
+  pending_profile_data?: Record<string, unknown> | null; // Profile data for pending users
 }
 
 export async function listTenantUsers(
@@ -48,7 +49,8 @@ export async function listTenantUsers(
         u.role, 
         u.is_verified, 
         u.status, 
-        u.created_at
+        u.created_at,
+        u.pending_profile_data
       FROM shared.users u
       ${whereClause}
       ORDER BY u.role, u.created_at DESC
@@ -97,7 +99,8 @@ export async function listTenantUsers(
     is_verified: row.is_verified,
     status: row.status,
     created_at: row.created_at,
-    additional_roles: rolesByUserId.get(row.id) || []
+    additional_roles: rolesByUserId.get(row.id) || [],
+    pending_profile_data: row.pending_profile_data as Record<string, unknown> | null | undefined
   }));
 }
 
@@ -177,6 +180,8 @@ export interface CreateUserInput {
   createdBy?: string | null;
   auditLogEnabled?: boolean;
   isTeachingStaff?: boolean;
+  // Profile data submitted during registration (stored as JSONB)
+  pendingProfileData?: Record<string, unknown> | null;
 }
 
 export interface CreatedUser {
@@ -254,6 +259,10 @@ export async function createUser(pool: Pool, input: CreateUserInput): Promise<Cr
     fields.push('is_teaching_staff');
     values.push(input.isTeachingStaff);
   }
+  if (input.pendingProfileData !== undefined && input.pendingProfileData !== null) {
+    fields.push('pending_profile_data');
+    values.push(JSON.stringify(input.pendingProfileData));
+  }
 
   const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
 
@@ -278,6 +287,23 @@ export async function updateUserStatus(
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // Get user info before update (needed for profile processing)
+    const userBeforeUpdate = await client.query(
+      `
+        SELECT id, email, role, pending_profile_data
+        FROM shared.users
+        WHERE id = $1 AND tenant_id = $2
+      `,
+      [userId, tenantId]
+    );
+
+    if (userBeforeUpdate.rowCount === 0) {
+      return null;
+    }
+
+    const userInfo = userBeforeUpdate.rows[0];
+
+    // Update status
     const updateResult = await client.query(
       `
         UPDATE shared.users
@@ -312,6 +338,10 @@ export async function updateUserStatus(
       newStatus: status,
       actorId
     });
+
+    // Process profile data based on status change
+    // Note: Profile processing requires tenant context, so it's handled in the route handler
+    // where req.tenantClient and req.tenant are available
 
     return {
       id: user.id,

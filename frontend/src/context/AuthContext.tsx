@@ -88,13 +88,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const auth = await authApi.login(payload);
+      
+      // Validate response structure
+      if (!auth || !auth.user || !auth.accessToken) {
+        throw new Error('Invalid response from server. Please try again.');
+      }
+      
       const normalised = normalizeUser(auth.user);
-      ensureActive(normalised);
+      
+      // Check if user is active - if not, clear session and show error
+      if (!isActive(normalised)) {
+        clearSession();
+        setUser(null);
+        const statusLabel = normalised.status === 'pending' ? 'pending admin approval' : 'inactive';
+        throw new Error(`Account ${statusLabel}. Please contact an administrator.`);
+      }
+      
+      // User is active - initialize session and set user state
       const authWithStatus: AuthResponse = { ...auth, user: normalised };
       initialiseSession(authWithStatus);
       setTenant(normalised.tenantId ?? null);
       setUser(normalised);
       return authWithStatus;
+    } catch (error) {
+      // Log error for debugging
+      console.error('[AuthContext] Login error:', error);
+      // Re-throw to let the caller handle it (LoginForm will show the error)
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -104,18 +124,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const auth = await authApi.register(payload);
+      
+      // Validate response structure
+      if (!auth || !auth.user || !auth.accessToken) {
+        throw new Error('Invalid response from server. Please try again.');
+      }
+      
       const normalised = normalizeUser(auth.user);
       const authWithStatus: AuthResponse = { ...auth, user: normalised };
+      
       // Only initialize session if user is active
       if (!isActive(normalised)) {
         clearSession();
         setUser(null);
         return authWithStatus;
       }
+      
+      // User is active - initialize session and set user state
       initialiseSession(authWithStatus);
       setTenant(normalised.tenantId ?? null);
       setUser(normalised);
       return authWithStatus;
+    } catch (error) {
+      // Log error for debugging
+      console.error('[AuthContext] Register error:', error);
+      // Re-throw to let the caller handle it
+      throw error;
     } finally {
       setIsLoading(false);
     }

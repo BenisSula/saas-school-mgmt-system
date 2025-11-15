@@ -69,6 +69,24 @@ export interface RegisterPayload {
   role: Role;
   tenantId?: string;
   tenantName?: string;
+  profile?: {
+    // Common fields
+    fullName?: string;
+    gender?: 'male' | 'female' | 'other';
+    address?: string;
+    // Student-specific fields
+    dateOfBirth?: string;
+    parentGuardianName?: string;
+    parentGuardianContact?: string;
+    studentId?: string;
+    classId?: string;
+    // Teacher-specific fields
+    phone?: string;
+    qualifications?: string;
+    yearsOfExperience?: number;
+    subjects?: string[];
+    teacherId?: string;
+  };
 }
 
 type FetchOptions = Omit<globalThis.RequestInit, 'headers'> & {
@@ -76,16 +94,56 @@ type FetchOptions = Omit<globalThis.RequestInit, 'headers'> & {
   responseType?: 'json' | 'blob';
 };
 
-async function extractError(response: Response): Promise<string> {
+/**
+ * Standardized API error response format
+ */
+export interface ApiErrorResponse {
+  status: 'error';
+  message: string;
+  field?: string;
+  code?: string;
+}
+
+/**
+ * Extracts error information from API response
+ * Returns both message and structured error data
+ */
+async function extractError(response: Response): Promise<{ message: string; error?: ApiErrorResponse }> {
   try {
     const payload = await response.json();
+    
+    // Check for standardized error format
+    if (payload?.status === 'error' && typeof payload?.message === 'string') {
+      return {
+        message: payload.message,
+        error: payload as ApiErrorResponse
+      };
+    }
+    
+    // Fallback to legacy format
     if (typeof payload?.message === 'string') {
-      return payload.message;
+      return { message: payload.message };
+    }
+    if (typeof payload?.error === 'string') {
+      return { message: payload.error };
+    }
+    
+    // In dev mode, include more details if available
+    if (process.env.NODE_ENV === 'development' && payload?.stack) {
+      console.error('[api] Error response:', payload);
     }
   } catch {
-    // ignore
+    // If JSON parsing fails, try to get text
+    try {
+      const text = await response.text();
+      if (text) {
+        return { message: text };
+      }
+    } catch {
+      // ignore
+    }
   }
-  return response.statusText || 'Request failed';
+  return { message: response.statusText || 'Request failed' };
 }
 
 export function setAuthHandlers(handlers: {
@@ -281,7 +339,13 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
   }
 
   if (!response.ok) {
-    throw new Error(await extractError(response));
+    const errorInfo = await extractError(response);
+    const error = new Error(errorInfo.message);
+    // Attach structured error data for field-level error handling
+    if (errorInfo.error) {
+      (error as any).apiError = errorInfo.error;
+    }
+    throw error;
   }
 
   if (response.status === 204) {
@@ -350,6 +414,7 @@ export interface TenantUser {
   created_at: string;
   status?: UserStatus;
   additional_roles?: Array<{ role: string; metadata?: Record<string, unknown> }>;
+  pending_profile_data?: Record<string, unknown> | null; // Profile data for pending users (available for admin review)
 }
 
 export interface AttendanceHistoryItem {
@@ -766,8 +831,8 @@ export const authApi = {
       },
       false
     );
-    initialiseSession(response);
-    scheduleTokenRefresh(response.expiresIn);
+    // Don't initialize session here - let AuthContext handle it after status check
+    // This prevents double initialization and allows proper status validation
     return response;
   },
   async register(payload: RegisterPayload): Promise<AuthResponse> {
@@ -779,8 +844,8 @@ export const authApi = {
       },
       false
     );
-    initialiseSession(response);
-    scheduleTokenRefresh(response.expiresIn);
+    // Don't initialize session here - let AuthContext handle it after status check
+    // This prevents double initialization and allows proper status validation
     return response;
   },
   async refresh(): Promise<AuthResponse | null> {
@@ -788,7 +853,47 @@ export const authApi = {
   }
 };
 
+export interface TenantLookupResult {
+  id: string;
+  name: string;
+  domain: string | null;
+  registrationCode: string | null;
+}
+
+export interface TenantLookupResponse {
+  results?: TenantLookupResult[];
+  count?: number;
+  id?: string;
+  name?: string;
+  domain?: string | null;
+  registrationCode?: string | null;
+}
+
 export const api = {
+  // Public tenant lookup for registration
+  lookupTenant: (params: { code?: string; name?: string; domain?: string }) => {
+    const queryParams = new URLSearchParams();
+    if (params.code) queryParams.append('code', params.code);
+    if (params.name) queryParams.append('name', params.name);
+    if (params.domain) queryParams.append('domain', params.domain);
+    return apiFetch<TenantLookupResult | TenantLookupResponse>(
+      `/auth/lookup-tenant?${queryParams.toString()}`,
+      {},
+      false // Don't retry on lookup failures
+    );
+  },
+  // List schools for dropdown/autocomplete
+  listSchools: (params?: { recent?: boolean; limit?: number; offset?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.recent !== undefined) queryParams.append('recent', String(params.recent));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    if (params?.offset) queryParams.append('offset', String(params.offset));
+    return apiFetch<{ schools: TenantLookupResult[]; count: number; total?: number; type: 'recent' | 'all' }>(
+      `/auth/list-schools?${queryParams.toString()}`,
+      {},
+      false // Don't retry on lookup failures
+    );
+  },
   // Configuration
   getBranding: () => apiFetch<BrandingConfig | null>('/configuration/branding'),
   updateBranding: (payload: Partial<BrandingConfig>) =>
@@ -960,6 +1065,34 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ reason })
     }),
+  // Admin user registration
+  registerUser: (payload: {
+    email: string;
+    password: string;
+    role: 'student' | 'teacher';
+    fullName: string;
+    gender?: 'male' | 'female' | 'other';
+    address?: string;
+    // Student fields
+    dateOfBirth?: string;
+    parentGuardianName?: string;
+    parentGuardianContact?: string;
+    studentId?: string;
+    classId?: string;
+    // Teacher fields
+    phone?: string;
+    qualifications?: string;
+    yearsOfExperience?: number;
+    subjects?: string[];
+    teacherId?: string;
+  }) =>
+    apiFetch<{ userId: string; profileId: string; email: string; role: Role; status: 'active' }>(
+      '/users/register',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      }
+    ),
   getTopSchools: (limit = 5) => apiFetch<TopSchool[]>(`/schools/top?limit=${limit}`),
   superuser: {
     getOverview: () => apiFetch<PlatformOverview>('/superuser/overview'),
