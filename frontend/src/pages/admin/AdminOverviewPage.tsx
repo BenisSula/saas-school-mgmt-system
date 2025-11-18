@@ -1,35 +1,27 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { api, type TenantUser, type TeacherProfile, type StudentRecord } from '../../lib/api';
-import { StatusBanner } from '../../components/ui/StatusBanner';
-import { useAsyncFeedback } from '../../hooks/useAsyncFeedback';
-import { Table } from '../../components/ui/Table';
+import { useMemo } from 'react';
+import { useAdminOverview } from '../../hooks/queries/useAdminQueries';
+import { StatCard } from '../../components/charts/StatCard';
+import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
+import { BarChart, type BarChartData } from '../../components/charts/BarChart';
+import { PieChart, type PieChartData } from '../../components/charts/PieChart';
 import { Button } from '../../components/ui/Button';
+import RouteMeta from '../../components/layout/RouteMeta';
+import { DashboardSkeleton } from '../../components/ui/DashboardSkeleton';
+import { StatusBanner } from '../../components/ui/StatusBanner';
+import { Users, GraduationCap, UserCheck, Shield, AlertCircle } from 'lucide-react';
+import type { TenantUser, TeacherProfile, StudentRecord } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/useQuery';
+import { formatDate } from '../../lib/utils/date';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 
-interface SchoolInfo {
-  id: string;
-  name: string;
-  address: Record<string, unknown>;
-}
+export default function AdminOverviewPage() {
+  const queryClient = useQueryClient();
+  const { data, isLoading, error } = useAdminOverview();
 
-interface DashboardStats {
-  totalUsers: number;
-  totalTeachers: number;
-  totalStudents: number;
-  totalHODs: number;
-  totalAdmins: number;
-  pendingUsers: number;
-}
+  const { school, users = [], teachers = [], students = [], classes = [] } = data || {};
 
-function AdminOverviewPage() {
-  const [schoolInfo, setSchoolInfo] = useState<SchoolInfo | null>(null);
-  const [users, setUsers] = useState<TenantUser[]>([]);
-  const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
-  const [students, setStudents] = useState<StudentRecord[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { status, message, setSuccess, setError, clear } = useAsyncFeedback();
-
-  const stats: DashboardStats = useMemo(() => {
+  const stats = useMemo(() => {
     const totalUsers = users.length;
     const totalTeachers = users.filter((u) => u.role === 'teacher').length;
     const totalStudents = users.filter((u) => u.role === 'student').length;
@@ -49,228 +41,288 @@ function AdminOverviewPage() {
     };
   }, [users]);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      clear();
+  // Role distribution chart
+  const roleDistribution: PieChartData[] = useMemo(() => {
+    return [
+      { label: 'Teachers', value: stats.totalTeachers },
+      { label: 'Students', value: stats.totalStudents },
+      { label: 'HODs', value: stats.totalHODs },
+      { label: 'Admins', value: stats.totalAdmins }
+    ].filter((item) => item.value > 0);
+  }, [stats]);
 
-      const [schoolResult, usersResult, teachersResult, studentsResult] = await Promise.allSettled([
-        api.getSchool(),
-        api.listUsers(),
-        api.listTeachers(),
-        api.listStudents()
-      ]);
+  // Status distribution chart
+  const statusDistribution: BarChartData[] = useMemo(() => {
+    const statusCounts = new Map<string, number>();
+    users.forEach((user) => {
+      const status = user.status || 'active';
+      statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+    });
+    return Array.from(statusCounts.entries()).map(([label, value]) => ({
+      label: label.charAt(0).toUpperCase() + label.slice(1),
+      value,
+      color: 'var(--brand-primary)'
+    }));
+  }, [users]);
 
-      if (schoolResult.status === 'fulfilled') {
-        setSchoolInfo(schoolResult.value);
-      } else {
-        console.warn('Failed to load school info:', schoolResult.reason);
-      }
-
-      if (usersResult.status === 'fulfilled') {
-        setUsers(usersResult.value);
-      } else {
-        const errorMessage = (usersResult.reason as Error).message ?? 'Unable to load users.';
-        setError(errorMessage);
-        toast.error(errorMessage);
-      }
-
-      if (teachersResult.status === 'fulfilled') {
-        setTeachers(teachersResult.value);
-      } else {
-        console.warn('Failed to load teachers:', teachersResult.reason);
-      }
-
-      if (studentsResult.status === 'fulfilled') {
-        setStudents(studentsResult.value);
-      } else {
-        console.warn('Failed to load students:', studentsResult.reason);
-      }
-
-      setSuccess('Dashboard data loaded successfully.');
-    } catch (error) {
-      const errorMessage = (error as Error).message;
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [clear, setError, setSuccess]);
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
-
-  const userColumns = useMemo(
+  const userColumns: DataTableColumn<TenantUser>[] = useMemo(
     () => [
-      { header: 'Email', key: 'email' as const },
-      { header: 'Role', key: 'role_display' as const },
-      { header: 'Status', key: 'status' as const },
-      { header: 'Verified', key: 'is_verified' as const },
-      { header: 'Created', key: 'created_at' as const }
+      {
+        key: 'email',
+        header: 'Email',
+        render: (row) => row.email,
+        sortable: true
+      },
+      {
+        key: 'role',
+        header: 'Role',
+        render: (row) => {
+          const additionalRoles = row.additional_roles?.map((r) => r.role).join(', ') || '';
+          return row.role === 'teacher' && additionalRoles.includes('hod')
+            ? 'Teacher (HOD)'
+            : row.role.charAt(0).toUpperCase() + row.role.slice(1);
+        },
+        sortable: true
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (row) => <StatusBadge status={row.status || 'active'} />,
+        sortable: true
+      },
+      {
+        key: 'is_verified',
+        header: 'Verified',
+        render: (row) => (row.is_verified ? 'Yes' : 'No')
+      },
+      {
+        key: 'created_at',
+        header: 'Created',
+        render: (row) => formatDate(row.created_at),
+        sortable: true
+      }
     ],
     []
   );
 
-  const userRows = useMemo(
-    () =>
-      users.map((user) => {
-        const additionalRoles = user.additional_roles?.map((r) => r.role).join(', ') || '';
-        const roleDisplay =
-          user.role === 'teacher' && additionalRoles.includes('hod')
-            ? 'Teacher (HOD)'
-            : user.role.charAt(0).toUpperCase() + user.role.slice(1);
-        return {
-          ...user,
-          role_display: roleDisplay,
-          status: user.status ?? 'active',
-          is_verified: user.is_verified ? 'Yes' : 'No',
-          created_at: new Date(user.created_at).toLocaleDateString()
-        };
-      }),
-    [users]
+  const teacherColumns: DataTableColumn<TeacherProfile>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        header: 'Name',
+        render: (row) => row.name,
+        sortable: true
+      },
+      {
+        key: 'email',
+        header: 'Email',
+        render: (row) => row.email,
+        sortable: true
+      },
+      {
+        key: 'subjects',
+        header: 'Subjects',
+        render: (row) => row.subjects.join(', ') || 'None'
+      },
+      {
+        key: 'classes',
+        header: 'Classes',
+        render: (row) => row.assigned_classes.join(', ') || 'None'
+      }
+    ],
+    []
   );
 
-  const teacherRows = useMemo(
-    () =>
-      teachers.map((teacher) => ({
-        id: teacher.id,
-        name: teacher.name,
-        email: teacher.email,
-        subjects: teacher.subjects.join(', ') || 'None',
-        classes: teacher.assigned_classes.join(', ') || 'None'
-      })),
-    [teachers]
+  const studentColumns: DataTableColumn<StudentRecord>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        header: 'Name',
+        render: (row) => `${row.first_name} ${row.last_name}`,
+        sortable: true
+      },
+      {
+        key: 'admission_number',
+        header: 'Admission Number',
+        render: (row) => row.admission_number || 'N/A',
+        sortable: true
+      },
+      {
+        key: 'class_id',
+        header: 'Class',
+        render: (row) => row.class_id || 'N/A',
+        sortable: true
+      }
+    ],
+    []
   );
 
-  const studentRows = useMemo(
-    () =>
-      students.map((student) => ({
-        id: student.id,
-        name: `${student.first_name} ${student.last_name}`,
-        admission_number: student.admission_number || 'N/A',
-        class_id: student.class_id || 'N/A'
-      })),
-    [students]
-  );
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.admin.overview() });
+  };
+
+  if (isLoading) {
+    return (
+      <RouteMeta title="Admin Dashboard">
+        <DashboardSkeleton />
+      </RouteMeta>
+    );
+  }
+
+  if (error) {
+    return (
+      <RouteMeta title="Admin Dashboard">
+        <StatusBanner status="error" message={(error as Error).message} />
+      </RouteMeta>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Executive Dashboard</h1>
-          <p className="text-sm text-slate-300">
-            Overview of school information, users, and statistics for your organization.
-          </p>
-        </div>
-        <Button onClick={loadData} loading={loading}>
-          Refresh
-        </Button>
-      </header>
+    <RouteMeta title="Admin Dashboard">
+      <div className="space-y-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+              Executive Dashboard
+            </h1>
+            <p className="text-sm text-[var(--brand-muted)]">
+              Overview of school information, users, and statistics for your organization.
+            </p>
+          </div>
+          <Button onClick={handleRefresh}>Refresh</Button>
+        </header>
 
-      {message ? <StatusBanner status={status} message={message} onDismiss={clear} /> : null}
-
-      {schoolInfo ? (
-        <section className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
-            School Information
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium text-[var(--brand-muted)]">School Name</p>
-              <p className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-                {schoolInfo.name}
-              </p>
-            </div>
-            {schoolInfo.address && typeof schoolInfo.address === 'object' ? (
+        {/* School Information */}
+        {school && (
+          <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+            <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
+              School Information
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <p className="text-sm font-medium text-[var(--brand-muted)]">Address</p>
+                <p className="text-sm font-medium text-[var(--brand-muted)]">School Name</p>
                 <p className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-                  {schoolInfo.address.city && typeof schoolInfo.address.city === 'string'
-                    ? schoolInfo.address.city
-                    : 'N/A'}
-                  {schoolInfo.address.country && typeof schoolInfo.address.country === 'string'
-                    ? `, ${schoolInfo.address.country}`
-                    : ''}
+                  {school.name}
                 </p>
               </div>
-            ) : null}
-          </div>
+              {school.address && typeof school.address === 'object' ? (
+                <div>
+                  <p className="text-sm font-medium text-[var(--brand-muted)]">Address</p>
+                  <p className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
+                    {school.address.city && typeof school.address.city === 'string'
+                      ? school.address.city
+                      : 'N/A'}
+                    {school.address.country && typeof school.address.country === 'string'
+                      ? `, ${school.address.country}`
+                      : ''}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        )}
+
+        {/* Stats Cards */}
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+          <StatCard
+            title="Total Users"
+            value={stats.totalUsers}
+            icon={<Users className="h-5 w-5" />}
+            description="All registered users"
+          />
+          <StatCard
+            title="Teachers"
+            value={stats.totalTeachers}
+            icon={<GraduationCap className="h-5 w-5" />}
+            description="Teaching staff"
+          />
+          <StatCard
+            title="HODs"
+            value={stats.totalHODs}
+            icon={<UserCheck className="h-5 w-5" />}
+            description="Heads of Department"
+          />
+          <StatCard
+            title="Students"
+            value={stats.totalStudents}
+            icon={<Users className="h-5 w-5" />}
+            description="Enrolled students"
+          />
+          <StatCard
+            title="Admins"
+            value={stats.totalAdmins}
+            icon={<Shield className="h-5 w-5" />}
+            description="Administrators"
+          />
+          <StatCard
+            title="Pending"
+            value={stats.pendingUsers}
+            icon={<AlertCircle className="h-5 w-5" />}
+            description="Awaiting approval"
+          />
         </section>
-      ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-4 shadow-sm">
-          <p className="text-sm font-medium text-[var(--brand-muted)]">Total Users</p>
-          <p className="text-3xl font-bold text-[var(--brand-surface-contrast)]">
-            {stats.totalUsers}
-          </p>
+        {/* Charts */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {roleDistribution.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+              <PieChart
+                data={roleDistribution}
+                title="Role Distribution"
+                size={250}
+              />
+            </div>
+          )}
+          {statusDistribution.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+              <BarChart
+                data={statusDistribution}
+                title="User Status Distribution"
+                height={250}
+              />
+            </div>
+          )}
         </div>
-        <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-4 shadow-sm">
-          <p className="text-sm font-medium text-[var(--brand-muted)]">Teachers</p>
-          <p className="text-3xl font-bold text-[var(--brand-surface-contrast)]">
-            {stats.totalTeachers}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-4 shadow-sm">
-          <p className="text-sm font-medium text-[var(--brand-muted)]">HODs</p>
-          <p className="text-3xl font-bold text-[var(--brand-surface-contrast)]">
-            {stats.totalHODs}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-4 shadow-sm">
-          <p className="text-sm font-medium text-[var(--brand-muted)]">Students</p>
-          <p className="text-3xl font-bold text-[var(--brand-surface-contrast)]">
-            {stats.totalStudents}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-4 shadow-sm">
-          <p className="text-sm font-medium text-[var(--brand-muted)]">Admins</p>
-          <p className="text-3xl font-bold text-[var(--brand-surface-contrast)]">
-            {stats.totalAdmins}
-          </p>
-        </div>
-      </section>
 
-      <section className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
-          All Users
-        </h2>
-        <Table columns={userColumns} data={userRows} caption="School users" />
-      </section>
+        {/* Users Table */}
+        <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
+            All Users
+          </h2>
+          <DataTable
+            data={users}
+            columns={userColumns}
+            pagination={{ pageSize: 10, showSizeSelector: true }}
+            emptyMessage="No users found"
+          />
+        </section>
 
-      <section className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
-          Teachers
-        </h2>
-        <Table
-          columns={[
-            { header: 'Name', key: 'name' as const },
-            { header: 'Email', key: 'email' as const },
-            { header: 'Subjects', key: 'subjects' as const },
-            { header: 'Classes', key: 'classes' as const }
-          ]}
-          data={teacherRows}
-          caption="School teachers"
-        />
-      </section>
+        {/* Teachers Table */}
+        <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
+            Teachers
+          </h2>
+          <DataTable
+            data={teachers}
+            columns={teacherColumns}
+            pagination={{ pageSize: 10, showSizeSelector: true }}
+            emptyMessage="No teachers found"
+          />
+        </section>
 
-      <section className="rounded-2xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-        <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
-          Students
-        </h2>
-        <Table
-          columns={[
-            { header: 'Name', key: 'name' as const },
-            { header: 'Admission Number', key: 'admission_number' as const },
-            { header: 'Class', key: 'class_id' as const }
-          ]}
-          data={studentRows}
-          caption="School students"
-        />
-      </section>
-    </div>
+        {/* Students Table */}
+        <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+          <h2 className="mb-4 text-xl font-semibold text-[var(--brand-surface-contrast)]">
+            Students
+          </h2>
+          <DataTable
+            data={students}
+            columns={studentColumns}
+            pagination={{ pageSize: 10, showSizeSelector: true }}
+            emptyMessage="No students found"
+          />
+        </section>
+      </div>
+    </RouteMeta>
   );
 }
-
-export default AdminOverviewPage;

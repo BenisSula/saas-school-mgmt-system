@@ -1,9 +1,15 @@
 import React from 'react';
+import { motion } from 'framer-motion';
+import { buttonPress } from '../../lib/utils/animations';
 
 export type ButtonVariant = 'solid' | 'outline' | 'ghost';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps
+  extends Omit<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    'onAnimationStart' | 'onAnimationEnd' | 'onAnimationIteration'
+  > {
   variant?: ButtonVariant;
   size?: ButtonSize;
   leftIcon?: React.ReactNode;
@@ -46,15 +52,26 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         'border border-transparent text-[var(--brand-primary)] bg-transparent hover:bg-[rgba(29,78,216,0.08)] focus-visible:outline-[var(--brand-primary)] disabled:opacity-50'
     };
 
+    // Extract animation-related props that conflict with framer-motion
+    const {
+      onAnimationStart,
+      onAnimationEnd,
+      onAnimationIteration,
+      ...restProps
+    } = props;
+
     return (
-      <button
+      <motion.button
         ref={ref}
         data-variant={variant}
         data-size={size}
-        className={`${baseClasses} ${SIZE_CLASSES[size]} ${variantClasses[variant]} ${className}`}
+        className={`${baseClasses} ${SIZE_CLASSES[size]} ${variantClasses[variant]} touch-target ${className}`}
         disabled={isDisabled}
         aria-disabled={isDisabled}
-        {...props}
+        whileHover={!isDisabled ? buttonPress.hover : undefined}
+        whileTap={!isDisabled ? buttonPress.tap : undefined}
+        transition={{ duration: 0.15 }}
+        {...(restProps as React.ButtonHTMLAttributes<HTMLButtonElement>)}
       >
         {loading && (
           <span
@@ -65,7 +82,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {leftIcon ? <span aria-hidden="true">{leftIcon}</span> : null}
         <span>{children}</span>
         {rightIcon ? <span aria-hidden="true">{rightIcon}</span> : null}
-      </button>
+      </motion.button>
     );
   }
 );

@@ -12,6 +12,7 @@ import { Modal } from '../components/ui/Modal';
 import { useAsyncFeedback } from '../hooks/useAsyncFeedback';
 import { sanitizeText } from '../lib/sanitize';
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../lib/utils/date';
 
 interface BrandingFormState {
   logoUrl: string;
@@ -44,23 +45,7 @@ function toDateInput(value: string | null | undefined): string {
   return '';
 }
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) {
-    return '—';
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    if (value.length >= 10) {
-      return value.slice(0, 10);
-    }
-    return value;
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit'
-  }).format(parsed);
-}
+// Using shared formatDate from utils
 
 function validateTermInput(input: {
   name: string;

@@ -3,44 +3,27 @@
  * Provides consistent layout structure for authentication pages
  */
 import type { ReactNode } from 'react';
-import { Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { LandingHeader } from '../components/layout/LandingHeader';
 import { LandingFooter } from '../components/layout/LandingFooter';
-import { AuthModal } from '../components/auth/AuthModal';
-import type { AuthView } from '../components/auth/AuthPanel';
 
 export interface AuthLayoutProps {
   children?: ReactNode;
-  showAuthModal?: boolean;
-  defaultAuthMode?: AuthView;
 }
 
 export function AuthLayout({
-  children,
-  showAuthModal = false,
-  defaultAuthMode = 'login'
+  children
 }: AuthLayoutProps) {
   const content = children ?? <Outlet />;
-  const [authOpen, setAuthOpen] = useState(showAuthModal);
-  const [authMode, setAuthMode] = useState<AuthView>(defaultAuthMode);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-[var(--brand-surface)] text-[var(--brand-surface-contrast)]">
       <LandingHeader
-        onSignIn={() => {
-          setAuthMode('login');
-          setAuthOpen(true);
-        }}
+        onSignIn={() => navigate('/auth?mode=login')}
       />
       <main className="mx-auto max-w-5xl px-4 py-10 md:px-8">{content}</main>
       <LandingFooter />
-      <AuthModal
-        isOpen={authOpen}
-        mode={authMode}
-        setMode={setAuthMode}
-        onClose={() => setAuthOpen(false)}
-      />
     </div>
   );
 }

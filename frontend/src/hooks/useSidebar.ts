@@ -35,6 +35,11 @@ export function useSidebar(options: UseSidebarOptions = {}): UseSidebarReturn {
   } = useUIStore();
   const prevStorageKeyRef = useRef<string | undefined>(storageKey);
   const prevCollapsedRef = useRef(sidebarCollapsed);
+  const sidebarCollapsedRef = useRef(sidebarCollapsed);
+
+  useEffect(() => {
+    sidebarCollapsedRef.current = sidebarCollapsed;
+  }, [sidebarCollapsed]);
 
   // Handle per-user storage key if provided - only on mount or storageKey change
   useEffect(() => {
@@ -50,12 +55,16 @@ export function useSidebar(options: UseSidebarOptions = {}): UseSidebarReturn {
 
     if (stored !== null) {
       const isCollapsed = stored === 'true';
-      if (isCollapsed !== sidebarCollapsed) {
+      if (isCollapsed !== sidebarCollapsedRef.current) {
         setSidebarCollapsed(isCollapsed);
         prevCollapsedRef.current = isCollapsed;
       }
+    } else if (sidebarCollapsedRef.current) {
+      // No stored preference for this user, default to expanded state
+      setSidebarCollapsed(false);
+      prevCollapsedRef.current = false;
     }
-  }, [storageKey, sidebarCollapsed, setSidebarCollapsed]);
+  }, [storageKey, setSidebarCollapsed]);
 
   // Persist to user-specific key when collapsed state changes
   useEffect(() => {

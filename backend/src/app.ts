@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import healthRouter from './routes/health';
 import authRouter from './routes/auth';
 import tenantsRouter from './routes/tenants';
@@ -20,10 +21,20 @@ import usersRouter from './routes/users';
 import teacherRouter from './routes/teacher';
 import adminAcademicsRouter from './routes/adminAcademics';
 import studentPortalRouter from './routes/studentPortal';
+import auditRouter from './routes/audit';
+import searchRouter from './routes/search';
+import notificationsRouter from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import authenticate from './middleware/authenticate';
 import { requirePermission } from './middleware/rbac';
 import { tenantResolver } from './middleware/tenantResolver';
+import { apiLimiter, writeLimiter, adminActionLimiter } from './middleware/rateLimiter';
+import { sanitizeInput } from './middleware/validateInput';
+import { setCsrfToken, csrfProtection } from './middleware/csrf';
+import { auditAdminActions } from './middleware/auditAdminActions';
+import { enhancedTenantIsolation } from './middleware/enhancedTenantIsolation';
+import { parsePagination } from './middleware/pagination';
+import { cachePolicies } from './middleware/cache';
 
 const app = express();
 
@@ -78,33 +89,49 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(cookieParser()); // Parse cookies for CSRF tokens
+app.use(express.json({ limit: '10mb' })); // Limit request body size
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Global middleware
+app.use(apiLimiter); // Apply rate limiting to all routes
+app.use(sanitizeInput); // Sanitize all input
+app.use(setCsrfToken); // Set CSRF token cookie
+
+// Health check (no auth required)
 app.use('/health', healthRouter);
+// Auth routes (with strict rate limiting)
 app.use('/auth', authRouter);
-app.use('/tenants', tenantsRouter);
-app.use('/students', studentsRouter);
-app.use('/teachers', teachersRouter);
-app.use('/branding', brandingRouter);
-app.use('/school', schoolRouter);
-app.use('/attendance', attendanceRouter);
-app.use('/exams', examsRouter);
-app.use('/grades', gradesRouter);
-app.use('/results', resultsRouter);
-app.use('/invoices', invoicesRouter);
-app.use('/payments', paymentsRouter);
-app.use('/configuration', configurationRouter);
-app.use('/reports', reportsRouter);
-app.use('/superuser', superuserRouter);
-app.use('/users', usersRouter);
-app.use('/teacher', teacherRouter);
-app.use('/student', studentPortalRouter);
+
+// Protected routes with enhanced security
+app.use('/tenants', authenticate, tenantResolver({ optional: true }), enhancedTenantIsolation, csrfProtection, auditAdminActions, tenantsRouter);
+app.use('/students', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.user, studentsRouter);
+app.use('/teachers', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.user, teachersRouter);
+app.use('/branding', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, brandingRouter);
+app.use('/school', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, schoolRouter);
+app.use('/attendance', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.user, attendanceRouter);
+app.use('/exams', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.user, examsRouter);
+app.use('/grades', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.sensitive, gradesRouter);
+app.use('/results', authenticate, tenantResolver(), enhancedTenantIsolation, parsePagination, cachePolicies.user, resultsRouter);
+app.use('/invoices', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.sensitive, invoicesRouter);
+app.use('/payments', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.sensitive, paymentsRouter);
+app.use('/configuration', authenticate, tenantResolver(), enhancedTenantIsolation, writeLimiter, csrfProtection, configurationRouter);
+app.use('/reports', authenticate, tenantResolver(), enhancedTenantIsolation, parsePagination, cachePolicies.admin, reportsRouter);
+app.use('/superuser', authenticate, tenantResolver({ optional: true }), adminActionLimiter, csrfProtection, auditAdminActions, cachePolicies.sensitive, superuserRouter);
+app.use('/users', authenticate, tenantResolver({ optional: true }), enhancedTenantIsolation, writeLimiter, csrfProtection, parsePagination, cachePolicies.admin, usersRouter);
+app.use('/teacher', authenticate, tenantResolver(), enhancedTenantIsolation, parsePagination, cachePolicies.user, teacherRouter);
+app.use('/student', authenticate, tenantResolver(), enhancedTenantIsolation, parsePagination, cachePolicies.user, studentPortalRouter);
+app.use('/audit', authenticate, tenantResolver({ optional: true }), parsePagination, cachePolicies.sensitive, auditRouter);
+app.use('/search', authenticate, tenantResolver(), enhancedTenantIsolation, parsePagination, cachePolicies.user, searchRouter);
+app.use('/notifications', authenticate, tenantResolver(), enhancedTenantIsolation, parsePagination, cachePolicies.user, notificationsRouter);
 
 app.get(
   '/admin/overview',
   authenticate,
   tenantResolver({ optional: true }),
+  enhancedTenantIsolation,
   requirePermission('users:manage'),
+  cachePolicies.admin,
   (req, res) => {
     res.status(200).json({
       message: 'Welcome, admin',
@@ -113,7 +140,7 @@ app.get(
   }
 );
 
-app.use('/admin', adminAcademicsRouter);
+app.use('/admin', authenticate, tenantResolver(), enhancedTenantIsolation, adminActionLimiter, csrfProtection, auditAdminActions, parsePagination, cachePolicies.admin, adminAcademicsRouter);
 
 app.use(errorHandler);
 

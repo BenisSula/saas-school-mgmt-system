@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { useMemo } from 'react';
 import { RouteMeta } from '../../components/layout/RouteMeta';
 import { DashboardSkeleton } from '../../components/ui/DashboardSkeleton';
 import { StatusBanner } from '../../components/ui/StatusBanner';
-import { Table, type TableColumn } from '../../components/ui/Table';
+import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
+import { BarChart, type BarChartData } from '../../components/charts/BarChart';
+import { PieChart, type PieChartData } from '../../components/charts/PieChart';
+import { StatCard } from '../../components/charts/StatCard';
+import { useSuperuserOverview } from '../../hooks/queries/useSuperuserQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/useQuery';
+import { Button } from '../../components/ui/Button';
 import { api, type PlatformOverview, type SubscriptionTier } from '../../lib/api';
-
-interface StatTile {
-  title: string;
-  value: number;
-  description?: string;
-}
+import { Building2, Users, AlertCircle, DollarSign } from 'lucide-react';
+import { formatDate } from '../../lib/utils/date';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { formatCurrency, formatNumber } from '../../lib/utils/data';
 
 const SUBSCRIPTION_LABELS: Record<SubscriptionTier, string> = {
   free: 'Free',
@@ -18,79 +22,112 @@ const SUBSCRIPTION_LABELS: Record<SubscriptionTier, string> = {
   paid: 'Paid'
 };
 
-const numberFormatter = new Intl.NumberFormat();
-const currencyFormatter = new Intl.NumberFormat(undefined, {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0
-});
+// Using shared formatters from utils
 
-export function SuperuserOverviewPage() {
-  const [overview, setOverview] = useState<PlatformOverview | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+export default function SuperuserOverviewPage() {
+  const queryClient = useQueryClient();
+  const { data: overview, isLoading, error } = useSuperuserOverview();
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await api.superuser.getOverview();
-        setOverview(data);
-      } catch (err) {
-        const message = (err as Error).message;
-        setError(message);
-        toast.error(message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, []);
-
-  const statTiles: StatTile[] = useMemo(() => {
+  const statTiles = useMemo(() => {
     if (!overview) return [];
     return [
       {
         title: 'Total schools',
         value: overview.totals.schools,
-        description: `${overview.totals.activeSchools} active, ${overview.totals.suspendedSchools} suspended`
+        description: `${overview.totals.activeSchools} active, ${overview.totals.suspendedSchools} suspended`,
+        icon: <Building2 className="h-5 w-5" />
       },
       {
         title: 'Total users',
         value: overview.totals.users,
-        description: `${overview.roleDistribution.admins} admins • ${overview.roleDistribution.hods} HODs • ${overview.roleDistribution.teachers} teachers • ${overview.roleDistribution.students} students`
+        description: `${overview.roleDistribution.admins} admins • ${overview.roleDistribution.hods} HODs • ${overview.roleDistribution.teachers} teachers • ${overview.roleDistribution.students} students`,
+        icon: <Users className="h-5 w-5" />
       },
       {
         title: 'Pending approvals',
         value: overview.totals.pendingUsers,
-        description: 'Users awaiting activation'
+        description: 'Users awaiting activation',
+        icon: <AlertCircle className="h-5 w-5" />
       },
       {
         title: 'Lifetime revenue',
         value: overview.revenue.total,
-        description: 'Sum of succeeded payments'
+        description: 'Sum of succeeded payments',
+        icon: <DollarSign className="h-5 w-5" />
       }
     ];
   }, [overview]);
 
-  const recentColumns: TableColumn<PlatformOverview['recentSchools'][number]>[] = [
-    { header: 'School', key: 'name' },
-    {
-      header: 'Subscription',
-      render: (row) => SUBSCRIPTION_LABELS[row.subscriptionType]
-    },
-    {
-      header: 'Status',
-      render: (row) => row.status.charAt(0).toUpperCase() + row.status.slice(1)
-    },
-    {
-      header: 'Created',
-      render: (row) => new Date(row.createdAt).toLocaleDateString()
-    }
-  ];
+  // Subscription breakdown chart
+  const subscriptionBreakdown: PieChartData[] = useMemo(() => {
+    if (!overview) return [];
+    return Object.entries(overview.subscriptionBreakdown)
+      .filter(([, value]) => value > 0)
+      .map(([tier, value]) => ({
+        label: SUBSCRIPTION_LABELS[tier as SubscriptionTier],
+        value
+      }));
+  }, [overview]);
 
-  if (loading) {
+  // Role distribution chart
+  const roleDistribution: BarChartData[] = useMemo(() => {
+    if (!overview) return [];
+    return [
+      { label: 'Admins', value: overview.roleDistribution.admins, color: 'var(--brand-primary)' },
+      { label: 'HODs', value: overview.roleDistribution.hods, color: 'var(--brand-accent)' },
+      { label: 'Teachers', value: overview.roleDistribution.teachers, color: 'var(--brand-info)' },
+      { label: 'Students', value: overview.roleDistribution.students, color: 'var(--brand-success)' }
+    ].filter((item) => item.value > 0);
+  }, [overview]);
+
+  // Revenue by tenant chart
+  const revenueByTenant: BarChartData[] = useMemo(() => {
+    if (!overview || overview.revenue.byTenant.length === 0) return [];
+    return overview.revenue.byTenant
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10)
+      .map((entry) => ({
+        label: entry.tenantId.slice(0, 8) + '…',
+        value: entry.amount,
+        color: 'var(--brand-primary)'
+      }));
+  }, [overview]);
+
+  const recentColumns: DataTableColumn<PlatformOverview['recentSchools'][number]>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        header: 'School',
+        render: (row) => row.name,
+        sortable: true
+      },
+      {
+        key: 'subscriptionType',
+        header: 'Subscription',
+        render: (row) => SUBSCRIPTION_LABELS[row.subscriptionType],
+        sortable: true
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (row) => <StatusBadge status={row.status} />,
+        sortable: true
+      },
+      {
+        key: 'createdAt',
+        header: 'Created',
+        render: (row) => formatDate(row.createdAt),
+        sortable: true
+      }
+    ],
+    []
+  );
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.superuser.overview() });
+  };
+
+  if (isLoading) {
     return (
       <RouteMeta title="Dashboard overview">
         <DashboardSkeleton />
@@ -101,7 +138,7 @@ export function SuperuserOverviewPage() {
   if (error) {
     return (
       <RouteMeta title="Dashboard overview">
-        <StatusBanner status="error" message={error} />
+        <StatusBanner status="error" message={(error as Error).message} />
       </RouteMeta>
     );
   }
@@ -114,63 +151,143 @@ export function SuperuserOverviewPage() {
     );
   }
 
+  const activeRate =
+    overview.totals.schools > 0
+      ? Math.round((overview.totals.activeSchools / overview.totals.schools) * 100)
+      : 0;
+  const verificationRate =
+    overview.totals.users > 0
+      ? Math.round(
+          ((overview.totals.users - overview.totals.pendingUsers) / overview.totals.users) * 100
+        )
+      : 0;
+
   return (
     <RouteMeta title="Dashboard overview">
       <div className="space-y-8">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+              Platform Overview
+            </h1>
+            <p className="text-sm text-[var(--brand-muted)]">
+              Monitor platform-wide statistics and health metrics
+            </p>
+          </div>
+          <Button onClick={handleRefresh}>Refresh</Button>
+        </header>
+
+        {/* Stats Cards */}
         <section
           className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
           aria-label="Platform statistics"
         >
           {statTiles.map((tile) => (
-            <article
+            <StatCard
               key={tile.title}
-              className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-5 shadow-sm transition hover:border-[var(--brand-primary)]/40 hover:shadow-lg"
-            >
-              <h2 className="text-sm uppercase tracking-wide text-[var(--brand-muted)]">
-                {tile.title}
-              </h2>
-              <p className="mt-3 text-3xl font-semibold text-[var(--brand-surface-contrast)]">
-                {tile.title === 'Lifetime revenue'
-                  ? currencyFormatter.format(tile.value)
-                  : numberFormatter.format(tile.value)}
-              </p>
-              {tile.description ? (
-                <p className="mt-2 text-xs text-[var(--brand-muted)]">{tile.description}</p>
-              ) : null}
-            </article>
+              title={tile.title}
+              value={
+                tile.title === 'Lifetime revenue'
+                  ? formatCurrency(tile.value)
+                  : formatNumber(tile.value)
+              }
+              description={tile.description}
+              icon={tile.icon}
+            />
           ))}
         </section>
 
+        {/* Charts */}
         <section
-          className="grid gap-6 lg:grid-cols-[1.2fr,0.8fr]"
+          className="grid gap-6 lg:grid-cols-2"
           aria-label="Subscription and revenue insights"
         >
-          <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <header className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-                Subscription mix
+          {subscriptionBreakdown.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">
+                Subscription Mix
               </h2>
-            </header>
-            <SubscriptionBreakdown breakdown={overview.subscriptionBreakdown} />
-          </div>
+              <PieChart data={subscriptionBreakdown} title="" size={250} />
+            </div>
+          )}
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <header className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-                Revenue snapshot
-              </h2>
-            </header>
-            <RevenueSummary total={overview.revenue.total} byTenant={overview.revenue.byTenant} />
+            <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">
+              Revenue Snapshot
+            </h2>
+            <div className="mt-6 space-y-4">
+              <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4 text-sm">
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  Total processed
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+                  {formatCurrency(overview.revenue.total)}
+                </p>
+              </div>
+              {revenueByTenant.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                    Top performing tenants
+                  </p>
+                  <BarChart data={revenueByTenant} title="" height={150} />
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
+        {/* Role Distribution and Health Metrics */}
+        <section
+          className="grid gap-6 lg:grid-cols-2"
+          aria-label="Platform activity and growth"
+        >
+          {roleDistribution.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">
+                Role Distribution
+              </h2>
+              <BarChart data={roleDistribution} title="" height={250} />
+            </div>
+          )}
+          <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">
+              Platform Health
+            </h2>
+            <div className="mt-6 space-y-4">
+              <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  Active schools rate
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+                  {activeRate}%
+                </p>
+                <p className="mt-1 text-xs text-[var(--brand-muted)]">
+                  {overview.totals.activeSchools} of {overview.totals.schools} schools active
+                </p>
+              </div>
+              <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  User verification rate
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+                  {verificationRate}%
+                </p>
+                <p className="mt-1 text-xs text-[var(--brand-muted)]">
+                  {overview.totals.pendingUsers} users pending approval
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Recent Schools */}
         <section aria-label="Recent schools">
           <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">
             Recently provisioned schools
           </h2>
-          <Table
-            columns={recentColumns}
+          <DataTable
             data={overview.recentSchools}
-            caption="Most recent schools"
+            columns={recentColumns}
+            pagination={{ pageSize: 10, showSizeSelector: true }}
             emptyMessage="No schools have been provisioned yet."
           />
         </section>
@@ -178,87 +295,3 @@ export function SuperuserOverviewPage() {
     </RouteMeta>
   );
 }
-
-function SubscriptionBreakdown({ breakdown }: { breakdown: Record<SubscriptionTier, number> }) {
-  const total = Object.values(breakdown).reduce((acc, value) => acc + value, 0);
-
-  if (total === 0) {
-    return (
-      <p className="mt-6 rounded-md border border-dashed border-[var(--brand-border)]/70 bg-slate-950/40 p-4 text-sm text-[var(--brand-muted)]">
-        No subscription data yet. Provision a school to begin tracking uptake.
-      </p>
-    );
-  }
-
-  return (
-    <div className="mt-6 space-y-4">
-      {Object.entries(breakdown).map(([tier, value]) => {
-        const label = SUBSCRIPTION_LABELS[tier as SubscriptionTier];
-        const percentage = value === 0 ? 0 : Math.round((value / total) * 100);
-        return (
-          <div key={tier}>
-            <div className="flex items-center justify-between text-sm font-medium text-[var(--brand-surface-contrast)]">
-              <span>{label}</span>
-              <span className="text-[var(--brand-muted)]">
-                {value} • {percentage}%
-              </span>
-            </div>
-            <div className="mt-2 h-2 rounded-full bg-slate-900/60">
-              <div
-                className="h-2 rounded-full bg-[var(--brand-primary)] transition-all"
-                style={{ width: `${percentage}%` }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function RevenueSummary({
-  total,
-  byTenant
-}: {
-  total: number;
-  byTenant: Array<{ tenantId: string; amount: number }>;
-}) {
-  if (byTenant.length === 0) {
-    return (
-      <p className="mt-6 rounded-md border border-dashed border-[var(--brand-border)]/70 bg-slate-950/40 p-4 text-sm text-[var(--brand-muted)]">
-        No payments recorded yet.
-      </p>
-    );
-  }
-
-  const topTenants = [...byTenant].sort((a, b) => b.amount - a.amount).slice(0, 5);
-
-  return (
-    <div className="mt-6 space-y-4">
-      <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4 text-sm">
-        <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">Total processed</p>
-        <p className="mt-1 text-2xl font-semibold text-[var(--brand-surface-contrast)]">
-          {currencyFormatter.format(total)}
-        </p>
-      </div>
-      <div>
-        <p className="mb-2 text-xs uppercase tracking-wide text-[var(--brand-muted)]">
-          Top performing tenants
-        </p>
-        <ul className="space-y-1 text-sm text-[var(--brand-surface-contrast)]">
-          {topTenants.map((entry) => (
-            <li
-              key={entry.tenantId}
-              className="flex items-center justify-between rounded-md border border-transparent bg-slate-900/60 px-3 py-2"
-            >
-              <span className="font-medium">{entry.tenantId.slice(0, 8)}…</span>
-              <span>{currencyFormatter.format(entry.amount)}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-export default SuperuserOverviewPage;

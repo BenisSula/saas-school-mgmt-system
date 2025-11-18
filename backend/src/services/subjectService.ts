@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { PoolClient } from 'pg';
-import { assertValidSchemaName } from '../db/tenantManager';
+import { getTableName, serializeJsonField } from '../lib/serviceUtils';
 import {
   classSubjectAssignmentSchema,
   studentSubjectSchema,
@@ -13,14 +13,9 @@ type ClassSubjectAssignmentInput = z.infer<typeof classSubjectAssignmentSchema>;
 type TeacherAssignmentInput = z.infer<typeof teacherAssignmentSchema>;
 type StudentSubjectInput = z.infer<typeof studentSubjectSchema>;
 
-function tableName(schema: string, table: string) {
-  assertValidSchemaName(schema);
-  return `${schema}.${table}`;
-}
-
 export async function listSubjects(client: PoolClient, schema: string) {
   const result = await client.query(
-    `SELECT * FROM ${tableName(schema, 'subjects')} ORDER BY name ASC`
+    `SELECT * FROM ${getTableName(schema, 'subjects')} ORDER BY name ASC`
   );
   return result.rows;
 }
@@ -28,7 +23,7 @@ export async function listSubjects(client: PoolClient, schema: string) {
 export async function createSubject(client: PoolClient, schema: string, payload: SubjectInput) {
   const result = await client.query(
     `
-      INSERT INTO ${tableName(schema, 'subjects')} (name, code, description, metadata)
+      INSERT INTO ${getTableName(schema, 'subjects')} (name, code, description, metadata)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `,
@@ -36,7 +31,7 @@ export async function createSubject(client: PoolClient, schema: string, payload:
       payload.name,
       payload.code?.toUpperCase() ?? null,
       payload.description ?? null,
-      JSON.stringify(payload.metadata ?? {})
+      serializeJsonField(payload.metadata ?? {})
     ]
   );
   return result.rows[0];
@@ -49,7 +44,7 @@ export async function updateSubject(
   payload: Partial<SubjectInput>
 ) {
   const existing = await client.query(
-    `SELECT * FROM ${tableName(schema, 'subjects')} WHERE id = $1`,
+    `SELECT * FROM ${getTableName(schema, 'subjects')} WHERE id = $1`,
     [id]
   );
   if (existing.rowCount === 0) {
@@ -59,7 +54,7 @@ export async function updateSubject(
   const subject = existing.rows[0];
   const result = await client.query(
     `
-      UPDATE ${tableName(schema, 'subjects')}
+      UPDATE ${getTableName(schema, 'subjects')}
       SET name = $1,
           code = $2,
           description = $3,
@@ -72,7 +67,7 @@ export async function updateSubject(
       payload.name ?? subject.name,
       (payload.code ?? subject.code)?.toUpperCase() ?? null,
       payload.description ?? subject.description,
-      JSON.stringify(payload.metadata ?? subject.metadata ?? {}),
+      serializeJsonField(payload.metadata ?? subject.metadata ?? {}),
       id
     ]
   );
@@ -80,7 +75,7 @@ export async function updateSubject(
 }
 
 export async function deleteSubject(client: PoolClient, schema: string, id: string) {
-  await client.query(`DELETE FROM ${tableName(schema, 'subjects')} WHERE id = $1`, [id]);
+  await client.query(`DELETE FROM ${getTableName(schema, 'subjects')} WHERE id = $1`, [id]);
 }
 
 export async function replaceClassSubjects(
@@ -89,7 +84,7 @@ export async function replaceClassSubjects(
   classId: string,
   payload: ClassSubjectAssignmentInput
 ) {
-  const table = tableName(schema, 'class_subjects');
+  const table = getTableName(schema, 'class_subjects');
   await client.query('BEGIN');
   try {
     await client.query(`DELETE FROM ${table} WHERE class_id = $1`, [classId]);
@@ -112,7 +107,7 @@ export async function replaceClassSubjects(
     `
       SELECT cs.class_id, cs.subject_id, s.name
       FROM ${table} cs
-      JOIN ${tableName(schema, 'subjects')} s ON s.id = cs.subject_id
+      JOIN ${getTableName(schema, 'subjects')} s ON s.id = cs.subject_id
       WHERE cs.class_id = $1
       ORDER BY s.name ASC
     `,
@@ -125,8 +120,8 @@ export async function listClassSubjects(client: PoolClient, schema: string, clas
   const result = await client.query(
     `
       SELECT cs.class_id, cs.subject_id, s.name, s.code
-      FROM ${tableName(schema, 'class_subjects')} cs
-      JOIN ${tableName(schema, 'subjects')} s ON s.id = cs.subject_id
+      FROM ${getTableName(schema, 'class_subjects')} cs
+      JOIN ${getTableName(schema, 'subjects')} s ON s.id = cs.subject_id
       WHERE cs.class_id = $1
       ORDER BY s.name ASC
     `,
@@ -143,7 +138,7 @@ export async function upsertTeacherAssignment(
 ) {
   const result = await client.query(
     `
-      INSERT INTO ${tableName(schema, 'teacher_assignments')} (teacher_id, class_id, subject_id, is_class_teacher, metadata)
+      INSERT INTO ${getTableName(schema, 'teacher_assignments')} (teacher_id, class_id, subject_id, is_class_teacher, metadata)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (teacher_id, class_id, subject_id)
       DO UPDATE SET
@@ -157,7 +152,7 @@ export async function upsertTeacherAssignment(
       payload.classId,
       payload.subjectId,
       payload.isClassTeacher ?? false,
-      JSON.stringify(payload.metadata ?? {})
+      serializeJsonField(payload.metadata ?? {})
     ]
   );
   return result.rows[0];
@@ -167,10 +162,10 @@ export async function listTeacherAssignments(client: PoolClient, schema: string)
   const result = await client.query(
     `
       SELECT ta.*, t.name as teacher_name, c.name as class_name, s.name as subject_name
-      FROM ${tableName(schema, 'teacher_assignments')} ta
-      JOIN ${tableName(schema, 'teachers')} t ON t.id = ta.teacher_id
-      JOIN ${tableName(schema, 'classes')} c ON c.id = ta.class_id
-      JOIN ${tableName(schema, 'subjects')} s ON s.id = ta.subject_id
+      FROM ${getTableName(schema, 'teacher_assignments')} ta
+      JOIN ${getTableName(schema, 'teachers')} t ON t.id = ta.teacher_id
+      JOIN ${getTableName(schema, 'classes')} c ON c.id = ta.class_id
+      JOIN ${getTableName(schema, 'subjects')} s ON s.id = ta.subject_id
       ORDER BY t.name ASC, c.name ASC
     `
   );
@@ -182,7 +177,7 @@ export async function removeTeacherAssignment(
   schema: string,
   assignmentId: string
 ) {
-  await client.query(`DELETE FROM ${tableName(schema, 'teacher_assignments')} WHERE id = $1`, [
+  await client.query(`DELETE FROM ${getTableName(schema, 'teacher_assignments')} WHERE id = $1`, [
     assignmentId
   ]);
 }
@@ -193,7 +188,7 @@ export async function replaceStudentSubjects(
   studentId: string,
   payload: StudentSubjectInput
 ) {
-  const table = tableName(schema, 'student_subjects');
+  const table = getTableName(schema, 'student_subjects');
   await client.query('BEGIN');
   try {
     await client.query(`DELETE FROM ${table} WHERE student_id = $1`, [studentId]);
@@ -216,7 +211,7 @@ export async function replaceStudentSubjects(
     `
       SELECT ss.student_id, ss.subject_id, s.name
       FROM ${table} ss
-      JOIN ${tableName(schema, 'subjects')} s ON s.id = ss.subject_id
+      JOIN ${getTableName(schema, 'subjects')} s ON s.id = ss.subject_id
       WHERE ss.student_id = $1
       ORDER BY s.name ASC
     `,
@@ -233,8 +228,8 @@ export async function listStudentSubjects(client: PoolClient, schema: string, st
              ss.metadata,
              s.name,
              s.code
-      FROM ${tableName(schema, 'student_subjects')} ss
-      JOIN ${tableName(schema, 'subjects')} s ON s.id = ss.subject_id
+      FROM ${getTableName(schema, 'student_subjects')} ss
+      JOIN ${getTableName(schema, 'subjects')} s ON s.id = ss.subject_id
       WHERE ss.student_id = $1
       ORDER BY s.name ASC
     `,
@@ -255,7 +250,7 @@ export async function recordPromotion(
 ) {
   await client.query(
     `
-      INSERT INTO ${tableName(schema, 'student_promotions')} (student_id, from_class_id, to_class_id, promoted_by, notes)
+      INSERT INTO ${getTableName(schema, 'student_promotions')} (student_id, from_class_id, to_class_id, promoted_by, notes)
       VALUES ($1, $2, $3, $4, $5)
     `,
     [studentId, fromClassId, toClassId, promotedBy, notes ?? null]

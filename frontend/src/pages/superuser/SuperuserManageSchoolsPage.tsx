@@ -14,6 +14,7 @@ import {
   type SubscriptionTier,
   type TenantLifecycleStatus
 } from '../../lib/api';
+import { formatDate } from '../../lib/utils/date';
 
 type FormMode = 'create' | 'edit';
 
@@ -79,6 +80,9 @@ export function SuperuserManageSchoolsPage() {
     fullName: '',
     phone: ''
   });
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState<boolean>(false);
+  const [selectedSchoolForAnalytics, setSelectedSchoolForAnalytics] =
+    useState<PlatformSchool | null>(null);
   const {
     status: feedbackStatus,
     message: feedbackMessage,
@@ -221,6 +225,11 @@ export function SuperuserManageSchoolsPage() {
     [loadSchools]
   );
 
+  const openAnalyticsModal = (school: PlatformSchool) => {
+    setSelectedSchoolForAnalytics(school);
+    setShowAnalyticsModal(true);
+  };
+
   const schoolColumns: TableColumn<PlatformSchool>[] = [
     {
       header: 'School',
@@ -261,7 +270,7 @@ export function SuperuserManageSchoolsPage() {
     },
     {
       header: 'Created',
-      render: (row) => new Date(row.createdAt).toLocaleDateString()
+      render: (row) => formatDate(row.createdAt)
     },
     {
       header: 'Actions',
@@ -269,6 +278,9 @@ export function SuperuserManageSchoolsPage() {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => openEditModal(row)}>
             Edit
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => openAnalyticsModal(row)}>
+            Analytics
           </Button>
           <Button size="sm" variant="ghost" onClick={() => openAdminModal(row)}>
             Add admin
@@ -476,6 +488,86 @@ export function SuperuserManageSchoolsPage() {
           </div>
         </div>
       </Modal>
+
+      {showAnalyticsModal && selectedSchoolForAnalytics && (
+        <Modal
+          title={`Usage analytics: ${selectedSchoolForAnalytics.name}`}
+          isOpen={showAnalyticsModal}
+          onClose={() => {
+            setShowAnalyticsModal(false);
+            setSelectedSchoolForAnalytics(null);
+          }}
+        >
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  Total users
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+                  {selectedSchoolForAnalytics.userCount || 0}
+                </p>
+              </div>
+              <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  Schema name
+                </p>
+                <p className="mt-1 text-sm font-mono text-[var(--brand-surface-contrast)] break-all">
+                  {selectedSchoolForAnalytics.schemaName}
+                </p>
+              </div>
+              <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                  Created
+                </p>
+                <p className="mt-1 text-sm text-[var(--brand-surface-contrast)]">
+                    {formatDate(selectedSchoolForAnalytics.createdAt)}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
+              <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)] mb-2">
+                Tenant information
+              </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--brand-muted)]">Subscription:</span>
+                  <span className="text-[var(--brand-surface-contrast)] capitalize">
+                    {selectedSchoolForAnalytics.subscriptionType}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--brand-muted)]">Status:</span>
+                  <span className="text-[var(--brand-surface-contrast)] capitalize">
+                    {selectedSchoolForAnalytics.status}
+                  </span>
+                </div>
+                {selectedSchoolForAnalytics.domain && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--brand-muted)]">Domain:</span>
+                    <span className="text-[var(--brand-surface-contrast)]">
+                      {selectedSchoolForAnalytics.domain}
+                    </span>
+                  </div>
+                )}
+                {selectedSchoolForAnalytics.registrationCode && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--brand-muted)]">Registration code:</span>
+                    <span className="text-[var(--brand-surface-contrast)]">
+                      {selectedSchoolForAnalytics.registrationCode}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setShowAnalyticsModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </RouteMeta>
   );
 }

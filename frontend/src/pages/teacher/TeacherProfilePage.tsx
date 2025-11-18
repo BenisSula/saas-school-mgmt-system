@@ -1,128 +1,184 @@
-import { useEffect, useState } from 'react';
-import RouteMeta from '../../components/layout/RouteMeta';
-import { StatusBanner } from '../../components/ui/StatusBanner';
-import { DashboardSkeleton } from '../../components/ui/DashboardSkeleton';
+import { useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react';
+import { ProfileLayout, type ProfileSection } from '../../components/profile/ProfileLayout';
+import { ProfileSection as Section } from '../../components/profile/ProfileSection';
+import { ActivityHistory } from '../../components/profile/ActivityHistory';
+import { AuditLogs } from '../../components/profile/AuditLogs';
+import { FileUploads } from '../../components/profile/FileUploads';
+import { useProfileData } from '../../hooks/useProfileData';
 import { api, type TeacherProfileDetail } from '../../lib/api';
 
 export default function TeacherProfilePage() {
-  const [profile, setProfile] = useState<TeacherProfileDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const teacherId = searchParams.get('teacherId');
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = await api.teacher.getProfile();
-        if (!cancelled) {
-          setProfile(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError((err as Error).message);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+  const profileLoader = useMemo(
+    () => async () => {
+      if (teacherId) {
+        const teacherData = await api.getTeacher(teacherId);
+        // Convert TeacherProfile to TeacherProfileDetail format
+        return {
+          id: teacherData.id,
+          name: teacherData.name,
+          email: teacherData.email,
+          subjects: teacherData.subjects,
+          classes: teacherData.assigned_classes.map((className) => ({
+            id: className,
+            name: className,
+            subjects: [],
+            isClassTeacher: false
+          }))
+        } as TeacherProfileDetail;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return api.teacher.getProfile();
+    },
+    [teacherId]
+  );
 
-  if (loading) {
-    return (
-      <RouteMeta title="Profile">
-        <DashboardSkeleton />
-      </RouteMeta>
-    );
-  }
+  const { profile, loading, error, activities, auditLogs, uploads, setUploads } = useProfileData<TeacherProfileDetail>({
+    userId: teacherId || undefined,
+    profileLoader,
+    enabled: true
+  });
 
-  if (error) {
-    return (
-      <RouteMeta title="Profile">
-        <StatusBanner status="error" message={error} />
-      </RouteMeta>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <RouteMeta title="Profile">
-        <StatusBanner status="info" message="Profile data not available." />
-      </RouteMeta>
-    );
-  }
+  const sections: ProfileSection[] = useMemo(
+    () => [
+      {
+        id: 'personal-info',
+        title: 'Personal information',
+        content: (
+          <Section isEmpty={!profile}>
+            {profile && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-[var(--brand-muted)]">Name</p>
+                  <p className="text-sm text-[var(--brand-surface-contrast)]">{profile.name}</p>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-[var(--brand-muted)]">Email</p>
+                  <p className="text-sm text-[var(--brand-surface-contrast)]">
+                    {profile.email || 'Not provided'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </Section>
+        )
+      },
+      {
+        id: 'subjects',
+        title: 'Subject specializations',
+        description: 'Subjects you are qualified to teach',
+        content: (
+          <Section
+            isEmpty={!profile || profile.subjects.length === 0}
+            emptyMessage="No subject specializations recorded"
+          >
+            {profile && profile.subjects.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {profile.subjects.map((subject) => (
+                  <span
+                    key={subject}
+                    className="rounded-full border border-[var(--brand-border)] bg-[var(--brand-primary)]/20 px-3 py-1 text-sm text-[var(--brand-primary)]"
+                  >
+                    {subject}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Section>
+        )
+      },
+      {
+        id: 'classes',
+        title: 'Assigned classes',
+        description: 'Classes you are currently teaching',
+        content: (
+          <Section
+            isEmpty={!profile || profile.classes.length === 0}
+            emptyMessage="You are not currently assigned to any classes"
+          >
+            {profile && profile.classes.length > 0 && (
+              <div className="space-y-3">
+                {profile.classes.map((clazz) => (
+                  <div
+                    key={clazz.id}
+                    className="rounded-lg border border-[var(--brand-border)] bg-slate-950/40 p-4"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm font-semibold text-[var(--brand-surface-contrast)]">
+                        {clazz.name}
+                      </p>
+                      {clazz.isClassTeacher && (
+                        <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-200">
+                          Classroom teacher
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs uppercase tracking-wide text-[var(--brand-muted)]">
+                      Subjects
+                    </p>
+                    <p className="text-sm text-[var(--brand-muted)]">
+                      {clazz.subjects.length > 0 ? clazz.subjects.join(', ') : 'Not specified'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        )
+      },
+      {
+        id: 'activity-history',
+        title: 'Activity history',
+        description: 'Recent actions and events',
+        content: <ActivityHistory activities={activities} />
+      },
+      {
+        id: 'uploads',
+        title: 'Uploads & attachments',
+        description: 'Files and documents associated with your profile',
+        content: (
+          <FileUploads
+            uploads={uploads}
+            canUpload={true}
+            canDelete={true}
+            onUpload={async (file) => {
+              // TODO: Implement upload API when available
+              console.log('Upload file:', file);
+            }}
+            onDelete={async (uploadId) => {
+              setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+            }}
+          />
+        )
+      },
+      {
+        id: 'audit-logs',
+        title: 'Audit logs',
+        description: 'Detailed log of all actions performed on your account',
+        content: (
+          <AuditLogs
+            logs={auditLogs}
+            onRefresh={async () => {
+              // Refresh will be handled by the hook when we reload
+              window.location.reload();
+            }}
+          />
+        )
+      }
+    ],
+    [profile, activities, auditLogs, uploads, setUploads]
+  );
 
   return (
-    <RouteMeta title="Profile">
-      <div className="space-y-6">
-        <header>
-          <h1 className="text-2xl font-semibold text-[var(--brand-surface-contrast)]">
-            {profile.name}
-          </h1>
-          <p className="text-sm text-[var(--brand-muted)]">{profile.email ?? 'No email on file'}</p>
-        </header>
-
-        <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">Subjects</h2>
-          {profile.subjects.length === 0 ? (
-            <p className="mt-2 text-sm text-[var(--brand-muted)]">
-              No subject specialisations recorded.
-            </p>
-          ) : (
-            <ul className="mt-3 flex flex-wrap gap-2 text-sm text-[var(--brand-surface-contrast)]">
-              {profile.subjects.map((subject) => (
-                <li
-                  key={subject}
-                  className="rounded-full border border-[var(--brand-border)] bg-black/15 px-3 py-1"
-                >
-                  {subject}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="space-y-3 rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-            Active classes
-          </h2>
-          {profile.classes.length === 0 ? (
-            <p className="text-sm text-[var(--brand-muted)]">
-              You are not currently assigned to any classes.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {profile.classes.map((clazz) => (
-                <li
-                  key={clazz.id}
-                  className="rounded-lg border border-[var(--brand-border)] bg-black/15 p-4"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-[var(--brand-surface-contrast)]">
-                      {clazz.name}
-                    </p>
-                    {clazz.isClassTeacher ? (
-                      <span className="rounded-full bg-emerald-500/20 px-2 py-1 text-[11px] font-semibold text-emerald-200">
-                        Classroom teacher
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-xs uppercase tracking-wide text-[var(--brand-muted)]">
-                    Subjects
-                  </p>
-                  <p className="text-sm text-[var(--brand-muted)]">
-                    {clazz.subjects.length > 0 ? clazz.subjects.join(', ') : 'Not specified'}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </RouteMeta>
+    <ProfileLayout
+      title={profile?.name || 'Profile'}
+      subtitle={profile?.email || undefined}
+      loading={loading}
+      error={error}
+      sections={sections}
+      showEditButton={false}
+    />
   );
 }

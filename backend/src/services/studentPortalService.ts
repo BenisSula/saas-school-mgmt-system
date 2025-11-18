@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { assertValidSchemaName } from '../db/tenantManager';
+import { getTableName, parseJsonField, serializeJsonField } from '../lib/serviceUtils';
 import { listStudentSubjects, recordPromotion } from './subjectService';
 import { generateTermReport, fetchReportPdf } from './reportService';
 
@@ -61,23 +61,8 @@ export interface StudentTermReportRecord {
   summary: unknown;
 }
 
-function tableName(schema: string, table: string) {
-  assertValidSchemaName(schema);
-  return `${schema}.${table}`;
-}
-
 function parseJson<T>(input: unknown, fallback: T): T {
-  if (typeof input === 'string') {
-    try {
-      return JSON.parse(input) as T;
-    } catch {
-      return fallback;
-    }
-  }
-  if (input && typeof input === 'object') {
-    return input as T;
-  }
-  return fallback;
+  return parseJsonField(input, fallback);
 }
 
 function toUuid(value: string): string {
@@ -89,7 +74,7 @@ function toUuid(value: string): string {
 
 async function ensureStudentExists(client: PoolClient, schema: string, studentId: string) {
   const result = await client.query(
-    `SELECT id FROM ${tableName(schema, 'students')} WHERE id = $1`,
+    `SELECT id FROM ${getTableName(schema, 'students')} WHERE id = $1`,
     [studentId]
   );
   if (result.rowCount === 0) {
@@ -113,7 +98,7 @@ export async function listStudentSubjectsDetailed(
   const dropRequestResult = await client.query(
     `
       SELECT subject_id, status, requested_at
-      FROM ${tableName(schema, 'student_drop_requests')}
+      FROM ${getTableName(schema, 'student_drop_requests')}
       WHERE student_id = $1
       ORDER BY requested_at DESC
     `,
@@ -158,7 +143,7 @@ export async function requestStudentSubjectDrop(
   const studentSubjectResult = await client.query(
     `
       SELECT id, metadata
-      FROM ${tableName(schema, 'student_subjects')}
+      FROM ${getTableName(schema, 'student_subjects')}
       WHERE student_id = $1 AND subject_id = $2
     `,
     [studentId, cleanSubjectId]
@@ -182,21 +167,21 @@ export async function requestStudentSubjectDrop(
 
   await client.query(
     `
-      UPDATE ${tableName(schema, 'student_subjects')}
+      UPDATE ${getTableName(schema, 'student_subjects')}
       SET metadata = $1::jsonb,
           updated_at = NOW()
       WHERE id = $2
     `,
-    [JSON.stringify(metadata), studentSubjectRow.id]
+    [serializeJsonField(metadata), studentSubjectRow.id]
   );
 
   await client.query(
     `
-      INSERT INTO ${tableName(schema, 'student_drop_requests')}
+      INSERT INTO ${getTableName(schema, 'student_drop_requests')}
         (student_id, subject_id, reason, status, metadata)
       VALUES ($1, $2, $3, 'pending', $4)
     `,
-    [studentId, cleanSubjectId, reason ?? null, JSON.stringify({ initiatedBy: 'student' })]
+    [studentId, cleanSubjectId, reason ?? null, serializeJsonField({ initiatedBy: 'student' })]
   );
 
   return { status: 'pending' as const };
@@ -216,8 +201,8 @@ export async function listStudentExamSummaries(
         e.exam_date,
         AVG(g.score)::float AS average_score,
         COUNT(*)::int AS subject_count
-      FROM ${tableName(schema, 'grades')} g
-      JOIN ${tableName(schema, 'exams')} e ON e.id = g.exam_id
+      FROM ${getTableName(schema, 'grades')} g
+      JOIN ${getTableName(schema, 'exams')} e ON e.id = g.exam_id
       WHERE g.student_id = $1
       GROUP BY e.id, e.name, e.exam_date
       ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC
@@ -243,8 +228,8 @@ export async function findLatestStudentExamId(
   const result = await client.query(
     `
       SELECT e.id
-      FROM ${tableName(schema, 'grades')} g
-      JOIN ${tableName(schema, 'exams')} e ON e.id = g.exam_id
+      FROM ${getTableName(schema, 'grades')} g
+      JOIN ${getTableName(schema, 'exams')} e ON e.id = g.exam_id
       WHERE g.student_id = $1
       ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC
       LIMIT 1
@@ -268,7 +253,7 @@ export async function getStudentProfileDetail(
   const studentResult = await client.query(
     `
       SELECT id, first_name, last_name, class_id, admission_number, parent_contacts
-      FROM ${tableName(schema, 'students')}
+      FROM ${getTableName(schema, 'students')}
       WHERE id = $1
     `,
     [studentId]
@@ -279,7 +264,7 @@ export async function getStudentProfileDetail(
   let className: string | null = null;
   if (student.class_id) {
     const classResult = await client.query(
-      `SELECT name FROM ${tableName(schema, 'classes')} WHERE id = $1`,
+      `SELECT name FROM ${getTableName(schema, 'classes')} WHERE id = $1`,
       [student.class_id]
     );
     className = classResult.rows[0]?.name ?? null;
@@ -311,14 +296,14 @@ export async function updateStudentProfile(
 ) {
   await ensureStudentExists(client, schema, studentId);
   const existingResult = await client.query(
-    `SELECT first_name, last_name, parent_contacts FROM ${tableName(schema, 'students')} WHERE id = $1`,
+    `SELECT first_name, last_name, parent_contacts FROM ${getTableName(schema, 'students')} WHERE id = $1`,
     [studentId]
   );
   const existing = existingResult.rows[0];
 
   await client.query(
     `
-      UPDATE ${tableName(schema, 'students')}
+      UPDATE ${getTableName(schema, 'students')}
       SET first_name = $1,
           last_name = $2,
           parent_contacts = $3::jsonb,
@@ -328,7 +313,7 @@ export async function updateStudentProfile(
     [
       payload.firstName ?? existing.first_name,
       payload.lastName ?? existing.last_name,
-      JSON.stringify(payload.parentContacts ?? parseJson(existing.parent_contacts, [])),
+      serializeJsonField(payload.parentContacts ?? parseJson(existing.parent_contacts, [])),
       studentId
     ]
   );
@@ -345,7 +330,7 @@ export async function requestStudentPromotion(
 ) {
   await ensureStudentExists(client, schema, studentId);
   const studentResult = await client.query(
-    `SELECT class_id FROM ${tableName(schema, 'students')} WHERE id = $1`,
+    `SELECT class_id FROM ${getTableName(schema, 'students')} WHERE id = $1`,
     [studentId]
   );
   const currentClassId = studentResult.rows[0]?.class_id ?? null;
@@ -361,7 +346,7 @@ export async function listStudentMessages(
   const result = await client.query(
     `
       SELECT id, title, body, class_name, status, sent_at
-      FROM ${tableName(schema, 'student_messages')}
+      FROM ${getTableName(schema, 'student_messages')}
       WHERE student_id = $1 OR student_id IS NULL
       ORDER BY sent_at DESC
       LIMIT 50
@@ -388,7 +373,7 @@ export async function markStudentMessageAsRead(
   await ensureStudentExists(client, schema, studentId);
   await client.query(
     `
-      UPDATE ${tableName(schema, 'student_messages')}
+      UPDATE ${getTableName(schema, 'student_messages')}
       SET status = 'read'
       WHERE id = $1 AND (student_id = $2 OR student_id IS NULL)
     `,
@@ -401,7 +386,7 @@ export async function listAcademicTermsForStudent(
   schema: string
 ): Promise<StudentTermSummary[]> {
   const result = await client.query(
-    `SELECT id, name, starts_on, ends_on FROM ${tableName(schema, 'academic_terms')} ORDER BY starts_on DESC NULLS LAST`
+    `SELECT id, name, starts_on, ends_on FROM ${getTableName(schema, 'academic_terms')} ORDER BY starts_on DESC NULLS LAST`
   );
   return result.rows.map((row) => ({
     id: row.id,
@@ -420,7 +405,7 @@ export async function listStudentTermReports(
   const result = await client.query(
     `
       SELECT id, term_id, generated_at, summary
-      FROM ${tableName(schema, 'term_reports')}
+      FROM ${getTableName(schema, 'term_reports')}
       WHERE student_id = $1
       ORDER BY generated_at DESC
     `,

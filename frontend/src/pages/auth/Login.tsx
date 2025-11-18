@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AuthFormLayout } from '../../components/auth/layout/AuthFormLayout';
 import { LoginForm } from '../../components/auth/LoginForm';
+import { HealthBanner } from '../../components/auth/HealthBanner';
 import { useAuth } from '../../context/AuthContext';
 import { getDefaultDashboardPath } from '../../lib/roleLinks';
 
@@ -19,17 +20,21 @@ export function LoginPage() {
         </p>
       }
     >
+      <HealthBanner />
       <LoginForm
         onSuccess={() => {
           toast.success('Signed in successfully.');
-          // Navigation will be handled by App.tsx useEffect when user state updates
-          // But we can navigate immediately if user is available
-          if (user) {
-            const dashboardPath = getDefaultDashboardPath(user.role);
-            navigate(dashboardPath, { replace: true });
-          } else {
-            navigate('/dashboard', { replace: true });
-          }
+          // Small delay to allow profile sync
+          setTimeout(() => {
+            // Navigation will be handled by App.tsx useEffect when user state updates
+            // But we can navigate immediately if user is available
+            if (user) {
+              const dashboardPath = getDefaultDashboardPath(user.role);
+              navigate(dashboardPath, { replace: true });
+            } else {
+              navigate('/dashboard', { replace: true });
+            }
+          }, 500);
         }}
         onSwitchToRegister={() => {
           navigate('/auth/register');

@@ -85,6 +85,65 @@ export async function getFeeOutstanding(client: PoolClient, schema: string, stat
   return result.rows;
 }
 
+export async function getDepartmentAnalytics(
+  client: PoolClient,
+  schema: string,
+  departmentId?: string
+) {
+  assertValidSchemaName(schema);
+  
+  // Get teachers in department
+  const teachersQuery = departmentId
+    ? `SELECT COUNT(*)::int AS count FROM teachers WHERE department_id = $1`
+    : `SELECT COUNT(*)::int AS count FROM teachers`;
+  const teachersResult = await client.query(teachersQuery, departmentId ? [departmentId] : []);
+
+  // Get students in classes taught by department teachers
+  const studentsQuery = departmentId
+    ? `
+      SELECT COUNT(DISTINCT s.id)::int AS count
+      FROM students s
+      JOIN classes c ON c.id = s.class_id
+      JOIN teacher_assignments ta ON ta.class_id = c.id
+      JOIN teachers t ON t.id = ta.teacher_id
+      WHERE t.department_id = $1
+    `
+    : `SELECT COUNT(*)::int AS count FROM students`;
+  const studentsResult = await client.query(studentsQuery, departmentId ? [departmentId] : []);
+
+  // Get average class size
+  const classSizeQuery = departmentId
+    ? `
+      SELECT AVG(class_size)::float AS avg_size
+      FROM (
+        SELECT COUNT(s.id) AS class_size
+        FROM classes c
+        JOIN students s ON s.class_id = c.id
+        JOIN teacher_assignments ta ON ta.class_id = c.id
+        JOIN teachers t ON t.id = ta.teacher_id
+        WHERE t.department_id = $1
+        GROUP BY c.id
+      ) sizes
+    `
+    : `
+      SELECT AVG(class_size)::float AS avg_size
+      FROM (
+        SELECT COUNT(s.id) AS class_size
+        FROM classes c
+        LEFT JOIN students s ON s.class_id = c.id
+        GROUP BY c.id
+      ) sizes
+    `;
+  const classSizeResult = await client.query(classSizeQuery, departmentId ? [departmentId] : []);
+
+  return {
+    departmentId,
+    totalTeachers: teachersResult.rows[0]?.count || 0,
+    totalStudents: studentsResult.rows[0]?.count || 0,
+    averageClassSize: Math.round((classSizeResult.rows[0]?.avg_size || 0) * 100) / 100
+  };
+}
+
 interface TermReportSummary {
   student: {
     id: string;

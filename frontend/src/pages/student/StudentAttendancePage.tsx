@@ -7,6 +7,7 @@ import { DatePicker } from '../../components/ui/DatePicker';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { api, type AttendanceHistoryItem, type AttendanceHistoryResponse } from '../../lib/api';
+import { deriveDateRange, formatDate, formatDateShort } from '../../lib/utils/date';
 
 interface Filters {
   from: string;
@@ -22,7 +23,7 @@ const ATTENDANCE_RANGES: Array<{ label: string; value: '7' | '30' | '90' | 'all'
 
 export default function StudentAttendancePage() {
   const { user } = useAuth();
-  const [filters, setFilters] = useState<Filters>(() => deriveRange('30'));
+  const [filters, setFilters] = useState<Filters>(() => deriveDateRange('30'));
   const [timing, setTiming] = useState<'7' | '30' | '90' | 'all'>('30');
   const [response, setResponse] = useState<AttendanceHistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,7 +60,7 @@ export default function StudentAttendancePage() {
       void loadAttendance(next);
       return;
     }
-    const next = deriveRange(value);
+    const next = deriveDateRange(value);
     setFilters(next);
     void loadAttendance(next);
   };
@@ -89,7 +90,7 @@ export default function StudentAttendancePage() {
     () => [
       {
         header: 'Date',
-        render: (row) => new Date(row.attendance_date).toLocaleDateString()
+        render: (row) => formatDate(row.attendance_date)
       },
       {
         header: 'Class',
@@ -235,20 +236,6 @@ export default function StudentAttendancePage() {
   );
 }
 
-function deriveRange(value: '7' | '30' | '90' | 'all'): Filters {
-  if (value === 'all') {
-    return { from: '', to: '' };
-  }
-  const days = Number(value);
-  const to = new Date();
-  const from = new Date();
-  from.setDate(to.getDate() - days + 1);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10)
-  };
-}
-
 interface SummaryCardProps {
   title: string;
   value: string;
@@ -269,7 +256,7 @@ function exportHistory(history: AttendanceHistoryItem[]) {
   const rows = [['Date', 'Class', 'Status']];
   history.forEach((item) => {
     rows.push([
-      new Date(item.attendance_date).toLocaleDateString(),
+      formatDateShort(item.attendance_date),
       item.class_id ?? '',
       item.status
     ]);

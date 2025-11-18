@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import type { AuthResponse } from '../../lib/api';
 import { AuthFormLayout } from '../../components/auth/layout/AuthFormLayout';
 import { RegisterForm } from '../../components/auth/RegisterForm';
+import { HealthBanner } from '../../components/auth/HealthBanner';
 import { getDefaultDashboardPath } from '../../lib/roleLinks';
 
 export function RegisterPage() {
@@ -11,9 +12,11 @@ export function RegisterPage() {
   const handleSuccess = (auth: AuthResponse) => {
     if (auth.user.status === 'active') {
       toast.success('Registration successful. Welcome aboard.');
-      // Navigate to appropriate dashboard based on role
-      const dashboardPath = getDefaultDashboardPath(auth.user.role);
-      navigate(dashboardPath, { replace: true });
+      // Small delay to allow profile sync
+      setTimeout(() => {
+        const dashboardPath = getDefaultDashboardPath(auth.user.role);
+        navigate(dashboardPath, { replace: true });
+      }, 500);
     }
   };
 
@@ -31,6 +34,7 @@ export function RegisterPage() {
         </p>
       }
     >
+      <HealthBanner />
       <RegisterForm
         onPending={handlePending}
         onSuccess={handleSuccess}

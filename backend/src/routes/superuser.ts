@@ -5,6 +5,8 @@ import {
   createAdminForSchool,
   createSchool,
   getPlatformOverview,
+  getTenantAnalytics,
+  getUsageMonitoring,
   listSchools,
   softDeleteSchool,
   updateSchool
@@ -113,6 +115,25 @@ router.post('/notifications', async (req, res, next) => {
       actorId: req.user?.id ?? null
     });
     res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/analytics/tenant/:tenantId', async (req, res, next) => {
+  try {
+    const analytics = await getTenantAnalytics(req.params.tenantId);
+    res.json(analytics);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/usage', async (req, res, next) => {
+  try {
+    const tenantId = req.query.tenantId as string | undefined;
+    const usage = tenantId ? await getUsageMonitoring(tenantId) : await getUsageMonitoring();
+    res.json(usage);
   } catch (error) {
     next(error);
   }

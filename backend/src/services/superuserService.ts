@@ -555,3 +555,122 @@ export async function createAdminForSchool(
 
   return admin;
 }
+
+export async function getTenantAnalytics(tenantId: string) {
+  const pool = getPool();
+  const tenantResult = await pool.query<{ schema_name: string; name: string; created_at: Date }>(
+    `SELECT schema_name, name, created_at FROM shared.tenants WHERE id = $1`,
+    [tenantId]
+  );
+
+  if (tenantResult.rowCount === 0) {
+    throw new Error('Tenant not found');
+  }
+
+  const tenant = tenantResult.rows[0];
+
+  return await withTenantSearchPath(pool, tenant.schema_name, async (client) => {
+    const [usersResult, teachersResult, studentsResult, classesResult] = await Promise.all([
+      client.query(`SELECT COUNT(*)::int AS count FROM users`),
+      client.query(`SELECT COUNT(*)::int AS count FROM teachers`),
+      client.query(`SELECT COUNT(*)::int AS count FROM students`),
+      client.query(`SELECT COUNT(*)::int AS count FROM classes`)
+    ]);
+
+    const [attendanceResult, examsResult] = await Promise.all([
+      client.query(`
+        SELECT COUNT(*)::int AS count 
+        FROM attendance_records 
+        WHERE attendance_date >= CURRENT_DATE - INTERVAL '30 days'
+      `),
+      client.query(`
+        SELECT COUNT(*)::int AS count 
+        FROM exams 
+        WHERE exam_date >= CURRENT_DATE - INTERVAL '90 days'
+      `)
+    ]);
+
+    return {
+      tenantId,
+      name: tenant.name,
+      createdAt: tenant.created_at,
+      userCount: usersResult.rows[0]?.count || 0,
+      teacherCount: teachersResult.rows[0]?.count || 0,
+      studentCount: studentsResult.rows[0]?.count || 0,
+      classCount: classesResult.rows[0]?.count || 0,
+      recentActivity: {
+        attendanceRecords: attendanceResult.rows[0]?.count || 0,
+        exams: examsResult.rows[0]?.count || 0
+      }
+    };
+  });
+}
+
+export async function getUsageMonitoring(tenantId: string): Promise<{
+  tenantId: string;
+  activeUsers: number;
+  storageUsed: number;
+  apiCalls: number;
+  lastActivity: string;
+}>;
+export async function getUsageMonitoring(): Promise<{
+  totalActiveUsers: number;
+  totalStorage: number;
+  totalApiCalls: number;
+}>;
+export async function getUsageMonitoring(tenantId?: string) {
+  const pool = getPool();
+  
+  if (tenantId) {
+    const tenantResult = await pool.query<{ schema_name: string }>(
+      `SELECT schema_name FROM shared.tenants WHERE id = $1`,
+      [tenantId]
+    );
+    
+    if (tenantResult.rowCount === 0) {
+      throw new Error('Tenant not found');
+    }
+
+    return await withTenantSearchPath(pool, tenantResult.rows[0].schema_name, async (client) => {
+      const [activeUsersResult, storageResult] = await Promise.all([
+        client.query(`
+          SELECT COUNT(DISTINCT user_id)::int AS count
+          FROM audit_logs
+          WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+        `),
+        client.query(`
+          SELECT COALESCE(SUM(pg_column_size(pdf)), 0)::bigint AS size
+          FROM term_reports
+        `)
+      ]);
+
+      return {
+        tenantId,
+        activeUsers: activeUsersResult.rows[0]?.count || 0,
+        storageUsed: Math.round((storageResult.rows[0]?.size || 0) / 1024 / 1024 * 100) / 100, // MB
+        apiCalls: 0, // Would need API logging middleware to track
+        lastActivity: new Date().toISOString()
+      };
+    });
+  }
+
+  // Platform-wide usage
+  const tenantsResult = await pool.query<{ id: string; schema_name: string }>(
+    `SELECT id, schema_name FROM shared.tenants WHERE status = 'active'`
+  );
+
+  let totalActiveUsers = 0;
+  let totalStorage = 0;
+
+  for (const tenant of tenantsResult.rows) {
+    const usage = await getUsageMonitoring(tenant.id);
+    totalActiveUsers += usage.activeUsers;
+    totalStorage += usage.storageUsed;
+  }
+
+  return {
+    totalActiveUsers,
+    totalStorage,
+    totalApiCalls: 0 // Would need API logging middleware
+  };
+}

@@ -1,21 +1,18 @@
 import type { PoolClient } from 'pg';
 import { StudentInput } from '../validators/studentValidator';
-import { assertValidSchemaName } from '../db/tenantManager';
+import { getTableName, parseJsonField, serializeJsonField } from '../lib/serviceUtils';
 
 const table = 'students';
 
-function tableName(schema: string): string {
-  assertValidSchemaName(schema);
-  return `${schema}.${table}`;
-}
-
 export async function listStudents(client: PoolClient, schema: string) {
-  const result = await client.query(`SELECT * FROM ${tableName(schema)} ORDER BY created_at DESC`);
+  const tableName = getTableName(schema, table);
+  const result = await client.query(`SELECT * FROM ${tableName} ORDER BY created_at DESC`);
   return result.rows;
 }
 
 export async function getStudent(client: PoolClient, schema: string, id: string) {
-  const result = await client.query(`SELECT * FROM ${tableName(schema)} WHERE id = $1`, [id]);
+  const tableName = getTableName(schema, table);
+  const result = await client.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
   return result.rows[0];
 }
 
@@ -56,9 +53,10 @@ export async function createStudent(client: PoolClient, schema: string, payload:
     }
   }
 
+  const tableName = getTableName(schema, table);
   const result = await client.query(
     `
-      INSERT INTO ${tableName(schema)} (first_name, last_name, date_of_birth, class_id, class_uuid, admission_number, parent_contacts)
+      INSERT INTO ${tableName} (first_name, last_name, date_of_birth, class_id, class_uuid, admission_number, parent_contacts)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `,
@@ -69,7 +67,7 @@ export async function createStudent(client: PoolClient, schema: string, payload:
       classIdName,
       classUuid,
       payload.admissionNumber ?? null,
-      JSON.stringify(payload.parentContacts ?? [])
+      serializeJsonField(payload.parentContacts ?? [])
     ]
   );
 
@@ -131,12 +129,13 @@ export async function updateStudent(
     class_id: classIdName,
     class_uuid: classUuid,
     admission_number: payload.admissionNumber ?? existing.admission_number,
-    parent_contacts: JSON.stringify(payload.parentContacts ?? existing.parent_contacts)
+    parent_contacts: serializeJsonField(payload.parentContacts ?? existing.parent_contacts)
   };
 
+  const tableName = getTableName(schema, table);
   const result = await client.query(
     `
-      UPDATE ${tableName(schema)}
+      UPDATE ${tableName}
       SET first_name = $1,
           last_name = $2,
           date_of_birth = $3,
@@ -164,7 +163,8 @@ export async function updateStudent(
 }
 
 export async function deleteStudent(client: PoolClient, schema: string, id: string) {
-  await client.query(`DELETE FROM ${tableName(schema)} WHERE id = $1`, [id]);
+  const tableName = getTableName(schema, table);
+  await client.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
 }
 
 export async function moveStudentToClass(
@@ -209,9 +209,10 @@ export async function moveStudentToClass(
     }
   }
 
+  const tableName = getTableName(schema, table);
   const result = await client.query(
     `
-      UPDATE ${tableName(schema)}
+      UPDATE ${tableName}
       SET class_id = $1,
           class_uuid = $2,
           updated_at = NOW()
@@ -229,11 +230,11 @@ export async function moveStudentToClass(
 }
 
 export async function getStudentClassRoster(client: PoolClient, schema: string, studentId: string) {
-  assertValidSchemaName(schema);
+  const tableName = getTableName(schema, table);
 
   // Get the student's class_uuid
   const studentResult = await client.query<{ class_uuid: string | null }>(
-    `SELECT class_uuid FROM ${tableName(schema)} WHERE id = $1`,
+    `SELECT class_uuid FROM ${tableName} WHERE id = $1`,
     [studentId]
   );
 
@@ -251,7 +252,7 @@ export async function getStudentClassRoster(client: PoolClient, schema: string, 
              last_name,
              admission_number,
              class_id
-      FROM ${tableName(schema)}
+      FROM ${tableName}
       WHERE class_uuid = $1
       ORDER BY last_name ASC, first_name ASC
     `,

@@ -1,180 +1,140 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import RouteMeta from '../../components/layout/RouteMeta';
 import { StatusBanner } from '../../components/ui/StatusBanner';
 import { Button } from '../../components/ui/Button';
-import { Table, type TableColumn } from '../../components/ui/Table';
+import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
+import { BarChart, type BarChartData } from '../../components/charts/BarChart';
+import { LineChart, type LineChartDataPoint } from '../../components/charts/LineChart';
+import { StatCard } from '../../components/charts/StatCard';
+import { useStudentDashboard } from '../../hooks/queries/useDashboardQueries';
 import { useAuth } from '../../context/AuthContext';
-import {
-  api,
-  type AttendanceHistoryItem,
-  type AttendanceHistoryResponse,
-  type Invoice,
-  type StudentProfileDetail,
-  type StudentResult,
-  type TeacherClassRosterEntry
-} from '../../lib/api';
-
-interface FeeSummary {
-  outstanding: number;
-  paidCount: number;
-  nextDueDate: string | null;
-}
-
-interface AttendanceSummary {
-  present: number;
-  total: number;
-  percentage: number;
-  recent: AttendanceHistoryItem[];
-}
+import { TrendingUp, Calendar, DollarSign, GraduationCap } from 'lucide-react';
+import type { AttendanceHistoryItem, Invoice, StudentResult } from '../../lib/api';
+import { formatDate } from '../../lib/utils/date';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 
 const RECENT_ATTENDANCE_LIMIT = 7;
 
 export default function StudentDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [attendance, setAttendance] = useState<AttendanceSummary>({
-    present: 0,
-    total: 0,
-    percentage: 0,
-    recent: []
-  });
-  const [feeSummary, setFeeSummary] = useState<FeeSummary>({
-    outstanding: 0,
-    paidCount: 0,
-    nextDueDate: null
-  });
-  const [latestResult, setLatestResult] = useState<StudentResult | null>(null);
-  const [profile, setProfile] = useState<StudentProfileDetail | null>(null);
-  const [roster, setRoster] = useState<TeacherClassRosterEntry[] | null>(null);
-  const [loadingRoster, setLoadingRoster] = useState(false);
+  const { attendance, invoices, profile, result, roster, loading, error } = useStudentDashboard();
 
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [attendanceResponse, invoices, profileDetail] = await Promise.all([
-          api.getStudentAttendance(user.id),
-          api.getStudentInvoices(user.id),
-          api.student.getProfile()
-        ]);
-
-        if (cancelled) return;
-
-        setAttendance(deriveAttendance(attendanceResponse));
-        setFeeSummary(deriveFeeSummary(invoices));
-        setProfile(profileDetail);
-
-        try {
-          const latestExam = await api.student.getLatestExamId();
-          if (!cancelled && latestExam.examId) {
-            const result = await api.getStudentResult(user.id, latestExam.examId);
-            if (!cancelled) {
-              setLatestResult(result);
-            }
-          } else if (!cancelled) {
-            setLatestResult(null);
-          }
-        } catch (resultError) {
-          if (!cancelled) {
-            setLatestResult(null);
-            if ((resultError as Error).message && import.meta.env.DEV) {
-              console.debug('[student-dashboard] Unable to load latest result', resultError);
-            }
-          }
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError((err as Error).message);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+  const attendanceSummary = useMemo(() => {
+    if (!attendance) return { present: 0, total: 0, percentage: 0, recent: [] };
+    const recent = attendance.history.slice(-RECENT_ATTENDANCE_LIMIT).reverse();
+    return {
+      present: attendance.summary.present,
+      total: attendance.summary.total,
+      percentage: Math.round(attendance.summary.percentage),
+      recent
     };
+  }, [attendance]);
 
-    void loadData();
+  const feeSummary = useMemo(() => {
+    if (!invoices) return { outstanding: 0, paidCount: 0, nextDueDate: null };
+    const outstanding = invoices.reduce((sum, invoice) => {
+      if (invoice.status === 'paid') return sum;
+      return sum + (invoice.total_amount - invoice.amount_paid);
+    }, 0);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+    const paidCount = invoices.filter((invoice) => invoice.status === 'paid').length;
+    const nextDue =
+      invoices
+        .filter((invoice) => invoice.status !== 'paid')
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0]
+        ?.due_date ?? null;
 
-  const outstandingFormatted = useMemo(
-    () => `$${feeSummary.outstanding.toFixed(2)}`,
-    [feeSummary.outstanding]
-  );
+    return { outstanding, paidCount, nextDueDate: nextDue };
+  }, [invoices]);
 
-  const recentAttendanceColumns: TableColumn<AttendanceHistoryItem>[] = useMemo(
+  const gradePercentage = useMemo(() => {
+    if (!result || result.breakdown.length === 0) return null;
+    const maxScore = result.breakdown.length * 100;
+    return Math.round((result.overall_score / maxScore) * 100);
+  }, [result]);
+
+  // Attendance trend chart data
+  const attendanceTrend: LineChartDataPoint[] = useMemo(() => {
+    if (!attendance?.history) return [];
+    return attendance.history.slice(-30).map((item, index) => ({
+      label: formatDateShort(item.attendance_date),
+      value: item.status === 'present' ? 1 : item.status === 'late' ? 0.5 : 0
+    }));
+  }, [attendance]);
+
+  // Subject performance chart (if result available)
+  const subjectPerformance: BarChartData[] = useMemo(() => {
+    if (!result?.breakdown) return [];
+    return result.breakdown.map((subject) => ({
+      label: subject.subject_name,
+      value: subject.score,
+      color: subject.score >= 70 ? 'var(--brand-primary)' : subject.score >= 50 ? '#f59e0b' : '#ef4444'
+    }));
+  }, [result]);
+
+  // Fee status breakdown
+  const feeBreakdown: BarChartData[] = useMemo(() => {
+    if (!invoices) return [];
+    const paid = invoices.filter((i) => i.status === 'paid').length;
+    const pending = invoices.filter((i) => i.status === 'pending').length;
+    const overdue = invoices.filter((i) => i.status === 'overdue').length;
+    return [
+      { label: 'Paid', value: paid, color: '#10b981' },
+      { label: 'Pending', value: pending, color: '#f59e0b' },
+      { label: 'Overdue', value: overdue, color: '#ef4444' }
+    ];
+  }, [invoices]);
+
+  const attendanceColumns: DataTableColumn<AttendanceHistoryItem>[] = useMemo(
     () => [
       {
+        key: 'attendance_date',
         header: 'Date',
-        render: (row) => new Date(row.attendance_date).toLocaleDateString()
+        render: (row) => formatDate(row.attendance_date),
+        sortable: true
       },
       {
+        key: 'class_id',
         header: 'Class',
         render: (row) => row.class_id ?? '—'
       },
       {
+        key: 'status',
         header: 'Status',
-        render: (row) => (
-          <span
-            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-              row.status === 'present'
-                ? 'bg-emerald-500/20 text-emerald-200'
-                : row.status === 'late'
-                  ? 'bg-amber-500/20 text-amber-200'
-                  : 'bg-rose-500/20 text-rose-200'
-            }`}
-          >
-            {row.status.toUpperCase()}
-          </span>
-        )
+        render: (row) => <StatusBadge status={row.status} />
       }
     ],
     []
   );
-
-  const gradePercentage = useMemo(() => {
-    if (!latestResult || latestResult.breakdown.length === 0) return null;
-    const maxScore = latestResult.breakdown.length * 100;
-    return Math.round((latestResult.overall_score / maxScore) * 100);
-  }, [latestResult]);
 
   const quickActions = useMemo(
     () => [
       {
         label: 'Profile',
         description: 'Update contact information or request a class change.',
-        action: () => navigate('/dashboard/student/profile')
+        action: () => navigate('/student/profile')
       },
       {
         label: 'Attendance',
         description: 'Review your attendance history and export records.',
-        action: () => navigate('/dashboard/student/attendance')
+        action: () => navigate('/student/attendance')
       },
       {
         label: 'Exams & results',
         description: 'Load exam breakdowns, request subject drops, and monitor grades.',
-        action: () => navigate('/dashboard/student/results')
+        action: () => navigate('/student/results')
       },
       {
         label: 'Fees',
         description: 'Track invoices, payments, and print receipts.',
-        action: () => navigate('/dashboard/student/fees')
+        action: () => navigate('/student/fees')
       },
       {
         label: 'Messages',
         description: 'Stay in touch with teachers and school leadership.',
-        action: () => navigate('/dashboard/student/messages')
+        action: () => navigate('/student/messages')
       }
     ],
     [navigate]
@@ -212,7 +172,7 @@ export default function StudentDashboardPage() {
   if (error) {
     return (
       <RouteMeta title="Student dashboard">
-        <StatusBanner status="error" message={error} />
+        <StatusBanner status="error" message={(error as Error).message} />
       </RouteMeta>
     );
   }
@@ -229,7 +189,8 @@ export default function StudentDashboardPage() {
           </p>
         </header>
 
-        {profile ? (
+        {/* Profile Snapshot */}
+        {profile && (
           <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
             <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -237,10 +198,10 @@ export default function StudentDashboardPage() {
                   Profile snapshot
                 </h2>
                 <p className="text-sm text-[var(--brand-muted)]">
-                  Here’s a quick overview of your class placement and enrolled subjects.
+                  Here's a quick overview of your class placement and enrolled subjects.
                 </p>
               </div>
-              <Button variant="outline" onClick={() => navigate('/dashboard/student/profile')}>
+              <Button variant="outline" onClick={() => navigate('/student/profile')}>
                 Manage profile
               </Button>
             </header>
@@ -271,14 +232,8 @@ export default function StudentDashboardPage() {
                       <span
                         key={subject.subjectId}
                         className="rounded-full border border-[var(--brand-border)] bg-black/15 px-3 py-1 text-xs text-[var(--brand-surface-contrast)]"
-                        title={
-                          subject.dropStatus !== 'none'
-                            ? `Drop status: ${subject.dropStatus}`
-                            : undefined
-                        }
                       >
                         {subject.name}
-                        {subject.dropStatus === 'pending' ? ' · drop requested' : ''}
                       </span>
                     ))}
                   </div>
@@ -286,49 +241,86 @@ export default function StudentDashboardPage() {
               </div>
             </div>
           </section>
-        ) : null}
+        )}
 
+        {/* Stats Cards */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <DashboardCard
+          <StatCard
             title="Attendance rate"
-            value={`${attendance.percentage}%`}
-            description={`${attendance.present} of ${attendance.total} sessions marked present`}
-            accent="bg-emerald-500/15 text-emerald-200"
+            value={`${attendanceSummary.percentage}%`}
+            change={{
+              value: attendanceSummary.percentage,
+              label: `${attendanceSummary.present} of ${attendanceSummary.total} sessions`
+            }}
+            icon={<Calendar className="h-5 w-5" />}
+            trend={attendanceSummary.percentage >= 80 ? 'up' : attendanceSummary.percentage >= 60 ? 'neutral' : 'down'}
           />
-          <DashboardCard
+          <StatCard
             title="Outstanding fees"
-            value={outstandingFormatted}
+            value={`$${feeSummary.outstanding.toFixed(2)}`}
             description={
               feeSummary.outstanding === 0
                 ? 'All invoices settled'
                 : feeSummary.nextDueDate
-                  ? `Next due ${new Date(feeSummary.nextDueDate).toLocaleDateString()}`
+                  ? `Next due ${formatDate(feeSummary.nextDueDate)}`
                   : 'Pending invoices require attention'
             }
-            accent="bg-amber-500/15 text-amber-200"
+            icon={<DollarSign className="h-5 w-5" />}
           />
-          <DashboardCard
+          <StatCard
             title="Invoices paid"
             value={String(feeSummary.paidCount)}
             description="Payments successfully recorded"
-            accent="bg-sky-500/15 text-sky-200"
+            icon={<TrendingUp className="h-5 w-5" />}
           />
-          <DashboardCard
+          <StatCard
             title="Latest grade"
             value={
-              latestResult
-                ? `${latestResult.grade} (${latestResult.overall_score.toFixed(1)})`
+              result
+                ? `${result.grade} (${result.overall_score.toFixed(1)})`
                 : 'Check results'
             }
             description={
-              latestResult && gradePercentage !== null
-                ? `${gradePercentage}% overall · ${latestResult.breakdown.length} subjects`
+              result && gradePercentage !== null
+                ? `${gradePercentage}% overall · ${result.breakdown.length} subjects`
                 : 'Load an exam in the results tab to see your grade.'
             }
-            accent="bg-violet-500/15 text-violet-200"
+            icon={<GraduationCap className="h-5 w-5" />}
           />
         </section>
 
+        {/* Charts */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {attendanceTrend.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+              <LineChart
+                data={attendanceTrend}
+                title="Attendance Trend (Last 30 Days)"
+                height={200}
+              />
+            </div>
+          )}
+          {subjectPerformance.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
+              <BarChart
+                data={subjectPerformance}
+                title="Subject Performance"
+                height={200}
+              />
+            </div>
+          )}
+          {feeBreakdown.length > 0 && (
+            <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm lg:col-span-2">
+              <BarChart
+                data={feeBreakdown}
+                title="Fee Status Breakdown"
+                height={200}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Attendance Snapshot */}
         <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
           <header className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -339,18 +331,19 @@ export default function StudentDashboardPage() {
                 Recent records help you visualise consistency and spot trends.
               </p>
             </div>
-            <Button variant="outline" onClick={() => navigate('/dashboard/student/attendance')}>
+            <Button variant="outline" onClick={() => navigate('/student/attendance')}>
               View full history
             </Button>
           </header>
-          <Table
-            columns={recentAttendanceColumns}
-            data={attendance.recent}
-            caption="Most recent attendance entries"
+          <DataTable
+            data={attendanceSummary.recent}
+            columns={attendanceColumns}
+            pagination={{ pageSize: 10 }}
             emptyMessage="No attendance captured yet."
           />
         </section>
 
+        {/* Quick Actions */}
         <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
           <header className="mb-3">
             <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
@@ -371,158 +364,13 @@ export default function StudentDashboardPage() {
                 <p className="text-sm font-semibold text-[var(--brand-surface-contrast)]">
                   {action.label}
                 </p>
-                <p className="text-xs text-[var(--brand-muted)] mt-1">{action.description}</p>
+                <p className="mt-1 text-xs text-[var(--brand-muted)]">{action.description}</p>
               </button>
             ))}
           </div>
         </section>
-
-        <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-                Class Roster
-              </h2>
-              <p className="text-sm text-[var(--brand-muted)]">
-                View all students in your class. Click Load Roster to see your classmates.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                if (!user?.id) return;
-                setLoadingRoster(true);
-                try {
-                  const rosterData = await api.student.getClassRoster();
-                  setRoster(rosterData);
-                  toast.success('Class roster loaded successfully.');
-                } catch (err) {
-                  toast.error((err as Error).message);
-                  setRoster(null);
-                } finally {
-                  setLoadingRoster(false);
-                }
-              }}
-              loading={loadingRoster}
-            >
-              Load Roster
-            </Button>
-          </header>
-          {roster && roster.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border border-[var(--brand-border)]">
-              <table className="min-w-full divide-y divide-[var(--brand-border)] text-sm">
-                <thead className="bg-black/20 text-xs uppercase tracking-wide text-[var(--brand-muted)]">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Name</th>
-                    <th className="px-4 py-2 text-left">Admission Number</th>
-                    <th className="px-4 py-2 text-left">Class</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--brand-border)] bg-black/10">
-                  {roster.map((student) => (
-                    <tr key={student.id}>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-[var(--brand-surface-contrast)]">
-                          {student.first_name} {student.last_name}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--brand-muted)]">
-                        {student.admission_number || 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--brand-muted)]">
-                        {student.class_id || 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : roster && roster.length === 0 ? (
-            <p className="text-sm text-[var(--brand-muted)]">No students found in your class.</p>
-          ) : (
-            <p className="text-sm text-[var(--brand-muted)]">
-              Click Load Roster to view your classmates.
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <header className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--brand-surface-contrast)]">
-                Request subject changes
-              </h2>
-              <p className="text-sm text-[var(--brand-muted)]">
-                Need to drop or change a subject? Submit a request for administrator review.
-              </p>
-            </div>
-            <Button
-              onClick={() => {
-                toast.info(
-                  'Subject drop requests will notify your guardian and school administrators.'
-                );
-                navigate('/dashboard/student/results');
-              }}
-            >
-              Start drop request
-            </Button>
-          </header>
-          <p className="text-xs text-[var(--brand-muted)]">
-            Subject changes require approval from school administrators to ensure timetable
-            alignment.
-          </p>
-        </section>
       </div>
     </RouteMeta>
-  );
-}
-
-function deriveAttendance(response: AttendanceHistoryResponse): AttendanceSummary {
-  const recent = response.history.slice(-RECENT_ATTENDANCE_LIMIT).reverse();
-  return {
-    present: response.summary.present,
-    total: response.summary.total,
-    percentage: Math.round(response.summary.percentage),
-    recent
-  };
-}
-
-function deriveFeeSummary(invoices: Invoice[]): FeeSummary {
-  const outstanding = invoices.reduce((sum, invoice) => {
-    if (invoice.status === 'paid') return sum;
-    return sum + (invoice.total_amount - invoice.amount_paid);
-  }, 0);
-
-  const paidCount = invoices.filter((invoice) => invoice.status === 'paid').length;
-  const nextDue =
-    invoices
-      .filter((invoice) => invoice.status !== 'paid')
-      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0]
-      ?.due_date ?? null;
-
-  return {
-    outstanding,
-    paidCount,
-    nextDueDate: nextDue
-  };
-}
-
-interface DashboardCardProps {
-  title: string;
-  value: string;
-  description: string;
-  accent: string;
-}
-
-function DashboardCard({ title, value, description, accent }: DashboardCardProps) {
-  return (
-    <article
-      className={`rounded-xl border border-[var(--brand-border)] bg-black/15 p-5 shadow-sm ${accent}`}
-    >
-      <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">{title}</p>
-      <p className="mt-3 text-3xl font-semibold">{value}</p>
-      <p className="mt-1 text-xs text-[var(--brand-muted)]">{description}</p>
-    </article>
   );
 }
 

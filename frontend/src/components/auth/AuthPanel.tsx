@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import type { AuthResponse } from '../../lib/api';
 import { LoginForm, type LoginFormProps } from './LoginForm';
 import { RegisterForm, type RegisterFormProps } from './RegisterForm';
+import { HealthBanner } from './HealthBanner';
 import { useBrand } from '../ui/BrandProvider';
 
 export type AuthView = 'login' | 'register';
@@ -99,6 +100,7 @@ export function AuthPanel({
       </div>
 
       <div className="mt-8">
+        <HealthBanner />
         {activeTab === 'login' ? (
           <LoginForm
             {...loginFormProps}

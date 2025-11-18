@@ -1,5 +1,4 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { Role, Permission } from '../config/permissions';
 import { hasPermission } from '../config/permissions';
@@ -54,14 +53,24 @@ export function ProtectedRoute({
     );
   }
 
+  const defaultSignInPrompt = (
+    <div className="rounded-lg border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 text-center text-sm text-[var(--brand-muted)]">
+      Please sign in to view this page.
+    </div>
+  );
+
+  const defaultAccessDeniedPrompt = (
+    <div
+      className="rounded-lg border border-red-500/40 bg-red-500/10 p-6 text-sm text-red-200"
+      role="alert"
+      aria-live="assertive"
+    >
+      You do not have permission to view this page.
+    </div>
+  );
+
   if (!user) {
-    return (
-      fallback ?? (
-        <div className="rounded-lg border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 text-center text-sm text-[var(--brand-muted)]">
-          Please sign in to view this page.
-        </div>
-      )
-    );
+    return fallback ?? defaultSignInPrompt;
   }
 
   if (user.status !== 'active') {
@@ -72,15 +81,17 @@ export function ProtectedRoute({
     );
   }
 
+  const accessDeniedContent = fallback ?? defaultAccessDeniedPrompt;
+
   // Check role-based access first
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/not-authorized" replace />;
+    return accessDeniedContent;
   }
 
   // Check permission-based access (only if roles check passed or no roles specified)
   // If both roles and permissions are specified, user must pass both checks
   if (allowedPermissions && !hasRequiredPermissions) {
-    return <Navigate to="/not-authorized" replace />;
+    return accessDeniedContent;
   }
 
   return <>{children}</>;

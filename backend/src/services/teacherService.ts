@@ -1,36 +1,34 @@
 import type { PoolClient } from 'pg';
 import { TeacherInput } from '../validators/teacherValidator';
-import { assertValidSchemaName } from '../db/tenantManager';
+import { getTableName, serializeJsonField } from '../lib/serviceUtils';
 
 const table = 'teachers';
 
-function tableName(schema: string): string {
-  assertValidSchemaName(schema);
-  return `${schema}.${table}`;
-}
-
 export async function listTeachers(client: PoolClient, schema: string) {
-  const result = await client.query(`SELECT * FROM ${tableName(schema)} ORDER BY created_at DESC`);
+  const tableName = getTableName(schema, table);
+  const result = await client.query(`SELECT * FROM ${tableName} ORDER BY created_at DESC`);
   return result.rows;
 }
 
 export async function getTeacher(client: PoolClient, schema: string, id: string) {
-  const result = await client.query(`SELECT * FROM ${tableName(schema)} WHERE id = $1`, [id]);
+  const tableName = getTableName(schema, table);
+  const result = await client.query(`SELECT * FROM ${tableName} WHERE id = $1`, [id]);
   return result.rows[0];
 }
 
 export async function createTeacher(client: PoolClient, schema: string, payload: TeacherInput) {
+  const tableName = getTableName(schema, table);
   const result = await client.query(
     `
-      INSERT INTO ${tableName(schema)} (name, email, subjects, assigned_classes)
+      INSERT INTO ${tableName} (name, email, subjects, assigned_classes)
       VALUES ($1, $2, $3, $4)
       RETURNING *
     `,
     [
       payload.name,
       payload.email,
-      JSON.stringify(payload.subjects ?? []),
-      JSON.stringify(payload.assignedClasses ?? [])
+      serializeJsonField(payload.subjects ?? []),
+      serializeJsonField(payload.assignedClasses ?? [])
     ]
   );
 
@@ -48,16 +46,17 @@ export async function updateTeacher(
     return null;
   }
 
+  const tableName = getTableName(schema, table);
   const next = {
     name: payload.name ?? existing.name,
     email: payload.email ?? existing.email,
-    subjects: JSON.stringify(payload.subjects ?? existing.subjects),
-    assigned_classes: JSON.stringify(payload.assignedClasses ?? existing.assigned_classes)
+    subjects: serializeJsonField(payload.subjects ?? existing.subjects),
+    assigned_classes: serializeJsonField(payload.assignedClasses ?? existing.assigned_classes)
   };
 
   const result = await client.query(
     `
-      UPDATE ${tableName(schema)}
+      UPDATE ${tableName}
       SET name = $1,
           email = $2,
           subjects = $3,
@@ -73,5 +72,6 @@ export async function updateTeacher(
 }
 
 export async function deleteTeacher(client: PoolClient, schema: string, id: string) {
-  await client.query(`DELETE FROM ${tableName(schema)} WHERE id = $1`, [id]);
+  const tableName = getTableName(schema, table);
+  await client.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
 }

@@ -3,7 +3,10 @@ import authenticate from '../middleware/authenticate';
 import tenantResolver from '../middleware/tenantResolver';
 import ensureTenantContext from '../middleware/ensureTenantContext';
 import { requirePermission } from '../middleware/rbac';
+import { validateInput } from '../middleware/validateInput';
+import { createPaginatedResponse } from '../middleware/pagination';
 import { teacherSchema } from '../validators/teacherValidator';
+import { z } from 'zod';
 import {
   listTeachers,
   getTeacher,
@@ -21,9 +24,21 @@ router.use(
   requirePermission('users:manage')
 );
 
-router.get('/', async (req, res) => {
-  const teachers = await listTeachers(req.tenantClient!, req.tenant!.schema);
-  res.json(teachers);
+const listTeachersQuerySchema = z.object({
+  limit: z.string().optional(),
+  offset: z.string().optional(),
+  page: z.string().optional()
+});
+
+router.get('/', validateInput(listTeachersQuerySchema, 'query'), async (req, res) => {
+  const pagination = req.pagination!;
+  const allTeachers = await listTeachers(req.tenantClient!, req.tenant!.schema);
+  
+  // Apply pagination
+  const paginated = allTeachers.slice(pagination.offset, pagination.offset + pagination.limit);
+  const response = createPaginatedResponse(paginated, allTeachers.length, pagination);
+  
+  res.json(response);
 });
 
 router.get('/:id', async (req, res) => {
@@ -34,32 +49,22 @@ router.get('/:id', async (req, res) => {
   res.json(teacher);
 });
 
-router.post('/', async (req, res, next) => {
-  const parsed = teacherSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ message: parsed.error.message });
-  }
-
+router.post('/', validateInput(teacherSchema, 'body'), async (req, res, next) => {
   try {
-    const teacher = await createTeacher(req.tenantClient!, req.tenant!.schema, parsed.data);
+    const teacher = await createTeacher(req.tenantClient!, req.tenant!.schema, req.body);
     res.status(201).json(teacher);
   } catch (error) {
     next(error);
   }
 });
 
-router.put('/:id', async (req, res, next) => {
-  const parsed = teacherSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ message: parsed.error.message });
-  }
-
+router.put('/:id', validateInput(teacherSchema.partial(), 'body'), async (req, res, next) => {
   try {
     const teacher = await updateTeacher(
       req.tenantClient!,
       req.tenant!.schema,
       req.params.id,
-      parsed.data
+      req.body
     );
     if (!teacher) {
       return res.status(404).json({ message: 'Teacher not found' });

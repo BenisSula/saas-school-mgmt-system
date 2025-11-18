@@ -8,6 +8,7 @@ import { AvatarDropdown } from '../ui/AvatarDropdown';
 import { SearchBar } from '../ui/SearchBar';
 import { Notifications } from '../ui/Notifications';
 import { useDashboardRouteMeta } from '../../context/DashboardRouteContext';
+import { useNotifications, useMarkNotificationAsRead, useMarkAllNotificationsAsRead } from '../../hooks/queries/useNotifications';
 
 export interface DashboardHeaderProps {
   onToggleSidebar: () => void;
@@ -28,6 +29,11 @@ export function DashboardHeader({
     ? ({ 'aria-expanded': 'true' as const } satisfies AriaAttributes)
     : ({ 'aria-expanded': 'false' as const } satisfies AriaAttributes);
   const { title, titleId } = useDashboardRouteMeta();
+  
+  const { data: notificationsData } = useNotifications(50);
+  const notifications = notificationsData || [];
+  const markAsRead = useMarkNotificationAsRead();
+  const markAllAsRead = useMarkAllNotificationsAsRead();
 
   return (
     <motion.header
@@ -36,17 +42,19 @@ export function DashboardHeader({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 120, damping: 20 }}
     >
-      <div className="mx-auto flex h-16 w-full items-center gap-3 px-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-14 w-full items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <button
+          <motion.button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-transparent text-[var(--brand-surface-contrast)] transition hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] lg:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-transparent text-[var(--brand-surface-contrast)] transition hover:bg-[var(--brand-surface-secondary)] focus-visible-ring touch-target lg:hidden"
             onClick={onToggleSidebar}
             aria-label="Toggle navigation"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             {...toggleAria}
           >
             <Menu className="h-5 w-5" />
-          </button>
+          </motion.button>
           <div className="flex items-center gap-2">
             <motion.div
               className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold uppercase text-white shadow-lg"
@@ -60,22 +68,29 @@ export function DashboardHeader({
             >
               {brandInitials}
             </motion.div>
-            <div className="hidden sm:block">
+            <motion.div
+              className="hidden sm:block"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
               <p className="text-sm font-semibold text-[var(--brand-surface-contrast)]">
                 SaaS School Portal
               </p>
               <p className="text-xs text-[var(--brand-muted)]">Multi-tenant school experience</p>
-            </div>
+            </motion.div>
           </div>
         </div>
 
         <div className="flex flex-1 items-center justify-center gap-4">
           <div className="hidden w-full max-w-md md:block">
             <SearchBar
-              placeholder="Search dashboard..."
+              placeholder="Search students, teachers, classes..."
               onSearch={(query) => {
-                // TODO: Implement search functionality
-                console.log('Search:', query);
+                if (query.trim().length >= 2) {
+                  // Could navigate to search results page or show search modal
+                  // For now, search is available via useSearch hook
+                }
               }}
             />
           </div>
@@ -96,14 +111,15 @@ export function DashboardHeader({
 
         <div className="flex items-center gap-2">
           <Notifications
-            notifications={[]}
+            notifications={notifications}
             onNotificationClick={(notification) => {
-              // TODO: Implement notification click handler
-              console.log('Notification clicked:', notification);
+              if (!notification.read) {
+                markAsRead.mutate(notification.id);
+              }
+              // Could navigate to relevant page based on notification metadata
             }}
             onMarkAllRead={() => {
-              // TODO: Implement mark all read
-              console.log('Mark all read');
+              markAllAsRead.mutate();
             }}
           />
           <ThemeToggleWithTooltip />

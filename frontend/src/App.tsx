@@ -6,12 +6,14 @@ import { LandingShell } from './layouts/LandingShell';
 import { AdminShell } from './layouts/AdminShell';
 import { getDefaultDashboardPath } from './lib/roleLinks';
 import RouteMeta from './components/layout/RouteMeta';
+import { useProfileSync } from './hooks/useProfileSync';
 
 const HomePage = lazy(() => import('./pages'));
-const LoginPage = lazy(() => import('./pages/auth/Login'));
-const RegisterPage = lazy(() => import('./pages/auth/Register'));
+const TestLoginPage = lazy(() => import('./pages/TestLoginPage'));
+// Legacy pages retained via redirects; not directly imported
+const AuthUnifiedPage = lazy(() => import('./pages/auth/Auth'));
 const AdminConfigurationPage = lazy(() => import('./pages/AdminConfigurationPage'));
-const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'));
+const AdminReportsPage = lazy(() => import('./pages/admin/AdminReportsPage'));
 const AdminRoleManagementPage = lazy(() => import('./pages/AdminRoleManagementPage'));
 const TeacherAttendancePage = lazy(() => import('./pages/TeacherAttendancePage'));
 const StudentFeesPage = lazy(() => import('./pages/student/StudentFeesPage'));
@@ -21,7 +23,7 @@ const StudentResultsPage = lazy(() => import('./pages/student/StudentResultsPage
 const StudentMessagesPage = lazy(() => import('./pages/student/StudentMessagesPage'));
 const StudentProfilePage = lazy(() => import('./pages/student/StudentProfilePage'));
 const StudentReportsPage = lazy(() => import('./pages/student/StudentReportsPage'));
-const AdminExamConfigPage = lazy(() => import('./pages/AdminExamConfigPage'));
+const AdminExamConfigPage = lazy(() => import('./pages/admin/AdminExamConfigPage'));
 const TeacherDashboardPage = lazy(() => import('./pages/teacher/TeacherDashboardPage'));
 const TeacherClassesPage = lazy(() => import('./pages/teacher/TeacherClassesPage'));
 const TeacherReportsPage = lazy(() => import('./pages/teacher/TeacherReportsPage'));
@@ -37,9 +39,22 @@ const SuperuserSubscriptionsPage = lazy(
 const SuperuserUsersPage = lazy(() => import('./pages/superuser/SuperuserUsersPage'));
 const SuperuserReportsPage = lazy(() => import('./pages/superuser/SuperuserReportsPage'));
 const SuperuserSettingsPage = lazy(() => import('./pages/superuser/SuperuserSettingsPage'));
+const SuperuserTenantAnalyticsPage = lazy(
+  () => import('./pages/superuser/SuperuserTenantAnalyticsPage')
+);
+const SuperuserUsageMonitoringPage = lazy(
+  () => import('./pages/superuser/SuperuserUsageMonitoringPage')
+);
 const AdminClassesSubjectsPage = lazy(() => import('./pages/admin/AdminClassesSubjectsPage'));
 const AdminAttendancePage = lazy(() => import('./pages/admin/AdminAttendancePage'));
 const AdminOverviewPage = lazy(() => import('./pages/admin/AdminOverviewPage'));
+const TeachersManagementPage = lazy(() => import('./pages/admin/TeachersManagementPage'));
+const StudentsManagementPage = lazy(() => import('./pages/admin/StudentsManagementPage'));
+const HODsManagementPage = lazy(() => import('./pages/admin/HODsManagementPage'));
+const AdminClassAssignmentPage = lazy(() => import('./pages/admin/AdminClassAssignmentPage'));
+const AdminDepartmentAnalyticsPage = lazy(() => import('./pages/admin/AdminDepartmentAnalyticsPage'));
+const HODProfilePage = lazy(() => import('./pages/hod/HODProfilePage'));
+const HODDashboardPage = lazy(() => import('./pages/hod/HODDashboardPage'));
 const StudentDashboardPage = lazy(() => import('./pages/student/StudentDashboardPage'));
 const NotAuthorizedPage = lazy(() => import('./pages/NotAuthorizedPage'));
 
@@ -47,10 +62,17 @@ function App() {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Sync profile data after login/registration
+  useProfileSync();
 
   useEffect(() => {
     if (!isAuthenticated && location.pathname.startsWith('/dashboard')) {
       navigate('/', { replace: true });
+      return;
+    }
+    // Don't redirect from test-login page
+    if (location.pathname === '/test-login') {
       return;
     }
     if (
@@ -78,10 +100,12 @@ function App() {
         <Route path="/" element={<LandingShell />}>
           <Route index element={<HomePage />} />
           <Route path="auth">
-            <Route path="login" element={<LoginPage />} />
-            <Route path="register" element={<RegisterPage />} />
+            <Route index element={<AuthUnifiedPage />} />
+            <Route path="login" element={<Navigate to="/auth?mode=login" replace />} />
+            <Route path="register" element={<Navigate to="/auth?mode=register" replace />} />
           </Route>
         </Route>
+        <Route path="/test-login" element={<TestLoginPage />} />
         <Route path="/not-authorized" element={<NotAuthorizedPage />} />
         <Route
           path="/dashboard"
@@ -146,6 +170,67 @@ function App() {
                 fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
               >
                 <AdminAttendancePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="teachers"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="Teachers management">
+                  <TeachersManagementPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="students"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="Students management">
+                  <StudentsManagementPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="hods"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <RouteMeta title="HODs management">
+                  <HODsManagementPage />
+                </RouteMeta>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="class-assignment"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <AdminClassAssignmentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="department-analytics"
+            element={
+              <ProtectedRoute
+                allowedRoles={['admin', 'superadmin']}
+                fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+              >
+                <AdminDepartmentAnalyticsPage />
               </ProtectedRoute>
             }
           />
@@ -232,6 +317,28 @@ function App() {
                   fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
                 >
                   <SuperuserSubscriptionsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="tenant-analytics"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserTenantAnalyticsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="usage"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <SuperuserUsageMonitoringPage />
                 </ProtectedRoute>
               }
             />
@@ -425,6 +532,30 @@ function App() {
                   fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
                 >
                   <StudentReportsPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+          <Route path="hod">
+            <Route
+              path="dashboard"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <HODDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="profile"
+              element={
+                <ProtectedRoute
+                  allowedRoles={['teacher', 'admin', 'superadmin']}
+                  fallback={<Navigate to={getDefaultDashboardPath(user?.role)} replace />}
+                >
+                  <HODProfilePage />
                 </ProtectedRoute>
               }
             />

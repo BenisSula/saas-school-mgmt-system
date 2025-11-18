@@ -1,32 +1,200 @@
-function normaliseBaseUrl(raw: string): string {
+import { getCsrfHeader } from './security/csrf';
+import {
+  storeRefreshToken,
+  getRefreshToken,
+  storeTenantId,
+  getTenantId,
+  clearAllTokens,
+  isValidTokenFormat
+} from './security/tokenSecurity';
+// import { sanitizeForDisplay } from './security/inputSanitization';
+import { extractPaginatedData, type PaginatedResponse } from './api/pagination';
+
+function stripTrailingSlash(input: string): string {
+  return input.endsWith('/') ? input.slice(0, -1) : input;
+}
+
+function isAbsoluteHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function trimAndUnquote(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function safeWindowOrigin(): string | null {
   try {
-    const url = new URL(raw);
-    if (url.hostname === 'localhost') {
-      url.hostname = '127.0.0.1';
-      return url.toString();
+    if (typeof window === 'undefined' || !window.location || !window.location.origin) {
+      return null;
     }
-    return url.toString();
+    const origin = window.location.origin;
+    if (!isAbsoluteHttpUrl(origin)) {
+      return null;
+    }
+    return origin;
   } catch {
-    return raw;
+    return null;
   }
 }
 
-const API_BASE_URL = (() => {
-  const explicit = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL;
-  if (explicit) {
-    return normaliseBaseUrl(explicit);
+function normaliseBaseUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    return stripTrailingSlash(url.toString());
+  } catch {
+    return stripTrailingSlash(raw);
   }
+}
+
+function resolveApiBaseUrl(): string {
+  // Dev: always resolve to a valid absolute base
   if (import.meta.env.DEV) {
-    const fallback = 'http://127.0.0.1:3001';
-    console.warn(
-      `[api] Falling back to default API base URL ${fallback}. Configure VITE_API_BASE_URL to override.`
-    );
-    return fallback;
+    const origin = safeWindowOrigin() ?? 'http://127.0.0.1:5173';
+    return stripTrailingSlash(`${origin}/api`);
   }
-  throw new Error('Missing VITE_API_BASE_URL environment variable');
-})();
-const REFRESH_STORAGE_KEY = 'saas-school.refreshToken';
-const TENANT_STORAGE_KEY = 'saas-school.tenantId';
+
+  const explicitRaw = (import.meta.env.VITE_API_BASE_URL ??
+    import.meta.env.VITE_API_URL) as string | undefined;
+
+  if (!explicitRaw) {
+    throw new Error('Missing or invalid VITE_API_BASE_URL: <empty> — see docs/.env.example');
+  }
+
+  const cleaned = trimAndUnquote(explicitRaw);
+  if (!cleaned) {
+    throw new Error('Missing or invalid VITE_API_BASE_URL: <whitespace> — see docs/.env.example');
+  }
+
+  // Relative base like "/api"
+  if (cleaned.startsWith('/')) {
+    const origin = safeWindowOrigin();
+    if (!origin) {
+      throw new Error(
+        `Invalid environment for relative VITE_API_BASE_URL (${cleaned}) — window.location.origin is not http(s).`
+      );
+    }
+    return stripTrailingSlash(`${origin}${cleaned}`);
+  }
+
+  // Absolute or host-only; require http/https
+  const normalised = stripTrailingSlash(normaliseBaseUrl(cleaned));
+  if (!isAbsoluteHttpUrl(normalised)) {
+    throw new Error(
+      `Missing or invalid VITE_API_BASE_URL: ${explicitRaw} — must start with http:// or https:// (or be a relative path like /api).`
+    );
+  }
+  return normalised;
+}
+
+let API_BASE_URL: string;
+try {
+  API_BASE_URL = resolveApiBaseUrl();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error('[SUMANO][API_BASE_URL] RESOLUTION FAILED:', message);
+  throw error;
+}
+
+// Validate API_BASE_URL is absolute http(s) URL
+if (!isAbsoluteHttpUrl(API_BASE_URL)) {
+  const errorMsg = `[SUMANO][API_BASE_URL] CRITICAL: Resolved to invalid base: "${API_BASE_URL}". Expected http:// or https:// URL.`;
+  console.error(errorMsg);
+  throw new Error(errorMsg);
+}
+
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line no-console
+  console.log('[SUMANO][API_BASE_URL]', API_BASE_URL);
+  // Validate window context
+  if (typeof window !== 'undefined') {
+    // eslint-disable-next-line no-console
+    console.log('[SUMANO][WINDOW_ORIGIN]', window.location.origin);
+    // eslint-disable-next-line no-console
+    console.log('[SUMANO][WINDOW_HREF]', window.location.href);
+  }
+}
+
+function safeJoinUrl(path: string, base: string): string {
+  // If path is already absolute, use it as-is
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  // Ensure base is never empty or invalid
+  if (!base || typeof base !== 'string') {
+    throw new Error(`Invalid API_BASE_URL: ${String(base)}. Expected a non-empty string.`);
+  }
+
+  // Base is already absolute http(s)
+  if (isAbsoluteHttpUrl(base)) {
+    try {
+      // Ensure base ends with / for proper URL resolution
+      const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+      // Ensure path starts with / for proper resolution
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      return new URL(normalizedPath, normalizedBase).toString();
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to construct URL with base "${base}" and path "${path}": ${errorMsg}. ` +
+        `Please check VITE_API_BASE_URL or restart the dev server. ` +
+        `Current window.location.origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
+      );
+    }
+  }
+
+  // Base is relative (e.g. '/api') – anchor to origin in the browser
+  const origin = safeWindowOrigin();
+  let absoluteBase: string;
+  
+  if (!origin) {
+    // Fallback to hardcoded dev server if window.location.origin is invalid (e.g., chrome-extension://)
+    const fallbackOrigin = import.meta.env.DEV ? 'http://127.0.0.1:5173' : null;
+    if (!fallbackOrigin) {
+      throw new Error(
+        `Cannot construct API URL: window.location.origin is not http(s) and no fallback available. ` +
+        `Please access the app via http://localhost:5173 (not via browser extension or file://). ` +
+        `Current origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
+      );
+    }
+    absoluteBase = `${fallbackOrigin}${base}`;
+  } else {
+    absoluteBase = `${origin}${base}`;
+  }
+
+  // Final validation before constructing URL
+  if (!isAbsoluteHttpUrl(absoluteBase)) {
+    throw new Error(
+      `Invalid absolute base URL constructed: "${absoluteBase}" (from origin: ${origin || 'null'}, base: ${base}). ` +
+      `This should never happen. Please report this error.`
+    );
+  }
+
+  try {
+    // Ensure absoluteBase ends with / for proper URL resolution
+    const normalizedBase = absoluteBase.endsWith('/') ? absoluteBase : `${absoluteBase}/`;
+    // Ensure path starts with / for proper resolution
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return new URL(normalizedPath, normalizedBase).toString();
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to construct URL with path "${path}" and base "${absoluteBase}": ${errorMsg}. ` +
+      `Please check your environment configuration. ` +
+      `Current window.location.origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
+    );
+  }
+}
+// Keys are kept in tokenSecurity; avoid unused local duplicates
+// const REFRESH_STORAGE_KEY = 'saas-school.refreshToken';
+// const TENANT_STORAGE_KEY = 'saas-school.tenantId';
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -158,16 +326,23 @@ export function setAuthHandlers(handlers: {
 
 function persistSession(tokens: { refresh: string | null; tenant: string | null }) {
   if (typeof window === 'undefined') return;
+  
+  // Use secure token storage for refresh token
   if (tokens.refresh) {
-    window.localStorage.setItem(REFRESH_STORAGE_KEY, tokens.refresh);
+    if (isValidTokenFormat(tokens.refresh)) {
+      storeRefreshToken(tokens.refresh);
+    } else {
+      console.warn('[api] Invalid refresh token format, not storing');
+    }
   } else {
-    window.localStorage.removeItem(REFRESH_STORAGE_KEY);
+    storeRefreshToken(null);
   }
 
+  // Tenant ID is non-sensitive, can use localStorage
   if (tokens.tenant) {
-    window.localStorage.setItem(TENANT_STORAGE_KEY, tokens.tenant);
+    storeTenantId(tokens.tenant);
   } else {
-    window.localStorage.removeItem(TENANT_STORAGE_KEY);
+    storeTenantId(null);
   }
 }
 
@@ -241,20 +416,27 @@ export function clearSession() {
   tenantId = null;
   clearRefreshTimer();
   persistSession({ refresh: null, tenant: null });
+  clearAllTokens(); // Clear all secure tokens
 }
 
 export function hydrateFromStorage(): { refreshToken: string | null; tenantId: string | null } {
   if (typeof window === 'undefined') {
     return { refreshToken: null, tenantId: null };
   }
-  const storedRefresh = window.localStorage.getItem(REFRESH_STORAGE_KEY);
-  const storedTenant = window.localStorage.getItem(TENANT_STORAGE_KEY);
+  
+  // Get refresh token from secure storage
+  const storedRefresh = getRefreshToken();
   refreshToken = storedRefresh;
+  
+  // Get tenant ID from localStorage (non-sensitive)
+  const storedTenant = getTenantId();
   const safeTenant = storedTenant && isValidTenantId(storedTenant) ? storedTenant : null;
   tenantId = safeTenant;
+  
   if (storedTenant && !isValidTenantId(storedTenant)) {
-    window.localStorage.removeItem(TENANT_STORAGE_KEY);
+    storeTenantId(null);
   }
+  
   return { refreshToken: storedRefresh, tenantId: safeTenant };
 }
 
@@ -306,6 +488,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
   const headers: Record<string, string> = {
     ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
     ...(rest.body ? { 'Content-Type': 'application/json' } : {}),
+    ...getCsrfHeader(), // Add CSRF token to all requests
     ...rest.headers
   };
 
@@ -313,25 +496,77 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  // Validate API_BASE_URL before attempting to use it
+  if (!API_BASE_URL || typeof API_BASE_URL !== 'string') {
+    const errorMsg = `API_BASE_URL is invalid: ${String(API_BASE_URL)}. Please check your environment configuration.`;
+    console.error('[apiFetch]', errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  if (!isAbsoluteHttpUrl(API_BASE_URL)) {
+    const errorMsg = `API_BASE_URL is not absolute: "${API_BASE_URL}". Expected http:// or https:// URL.`;
+    console.error('[apiFetch]', errorMsg);
+    console.error('[apiFetch] Current window.location:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+    throw new Error(errorMsg);
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    // Build a safe absolute URL and avoid accidental double slashes
+    let requestUrl: string;
+    try {
+      requestUrl = safeJoinUrl(path, API_BASE_URL);
+    } catch (urlError) {
+      const errorMsg = urlError instanceof Error ? urlError.message : String(urlError);
+      console.error('[apiFetch] URL construction failed:', {
+        path,
+        API_BASE_URL,
+        error: errorMsg,
+        windowOrigin: typeof window !== 'undefined' ? window.location.origin : 'N/A',
+        windowHref: typeof window !== 'undefined' ? window.location.href : 'N/A'
+      });
+      throw new Error(`Failed to construct API URL: ${errorMsg}`);
+    }
+    // Pre-rewrite docker service hostname for host browser in dev
+    if (import.meta.env.DEV && requestUrl.includes('//backend:')) {
+      requestUrl = requestUrl.replace('//backend:', '//127.0.0.1:');
+    }
+    response = await fetch(requestUrl, {
       ...rest,
-      headers
+      headers,
+      credentials: 'include' // Include cookies for CSRF token
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Network error';
-    if (
-      errorMessage.includes('Failed to fetch') ||
-      errorMessage.includes('NetworkError') ||
-      errorMessage.includes('ERR_')
-    ) {
-      throw new Error(
-        `Unable to connect to the server at ${API_BASE_URL}. Please ensure the backend server is running and accessible.`
-      );
+    // Fallback retry: if dev build points to a Docker service hostname that isn't resolvable
+    // from the host browser (e.g., http://backend:3001), retry once with 127.0.0.1
+    try {
+      const reqUrl = safeJoinUrl(path, API_BASE_URL);
+      if (reqUrl.includes('//backend:')) {
+        const fallbackUrl = reqUrl.replace('//backend:', '//127.0.0.1:');
+        response = await fetch(fallbackUrl, {
+          ...rest,
+          headers,
+          credentials: 'include'
+        });
+      } else {
+        throw error;
+      }
+    } catch (retryError) {
+      const retryMsg = retryError instanceof Error ? retryError.message : String(retryError);
+      if (
+        retryMsg.includes('Failed to fetch') ||
+        retryMsg.includes('NetworkError') ||
+        retryMsg.includes('ERR_') ||
+        retryMsg.includes('ERR_NAME_NOT_RESOLVED')
+      ) {
+        throw new Error(
+          `Unable to connect to the server at ${API_BASE_URL}. Please ensure the backend server is running and accessible.`
+        );
+      }
+      throw new Error(`Network request failed: ${retryMsg}`);
     }
-    throw new Error(`Network request failed: ${errorMessage}`);
   }
+  
 
   if (response.status === 401 && retry && refreshToken) {
     const refreshed = await performRefresh();
@@ -515,6 +750,37 @@ export interface TeacherProfile {
   email: string;
   subjects: string[];
   assigned_classes: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Backend returns snake_case with JSON strings, transform to frontend format
+function transformTeacher(backendTeacher: {
+  id: string;
+  name: string;
+  email: string;
+  subjects: string | string[];
+  assigned_classes: string | string[];
+  created_at?: string;
+  updated_at?: string;
+}): TeacherProfile {
+  return {
+    id: backendTeacher.id,
+    name: backendTeacher.name,
+    email: backendTeacher.email,
+    subjects: Array.isArray(backendTeacher.subjects)
+      ? backendTeacher.subjects
+      : typeof backendTeacher.subjects === 'string'
+        ? JSON.parse(backendTeacher.subjects || '[]')
+        : [],
+    assigned_classes: Array.isArray(backendTeacher.assigned_classes)
+      ? backendTeacher.assigned_classes
+      : typeof backendTeacher.assigned_classes === 'string'
+        ? JSON.parse(backendTeacher.assigned_classes || '[]')
+        : [],
+    created_at: backendTeacher.created_at,
+    updated_at: backendTeacher.updated_at
+  };
 }
 
 export interface StudentRecord {
@@ -524,6 +790,50 @@ export interface StudentRecord {
   class_id: string | null;
   class_uuid?: string | null;
   admission_number: string | null;
+  date_of_birth?: string | null;
+  parent_contacts?: Array<{ name: string; relationship: string; phone: string }> | string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Backend returns snake_case with JSON strings, transform to frontend format
+function transformStudent(backendStudent: {
+  id: string;
+  first_name: string;
+  last_name: string;
+  class_id: string | null;
+  class_uuid?: string | null;
+  admission_number: string | null;
+  date_of_birth?: string | null;
+  parent_contacts?: string | Array<{ name: string; relationship: string; phone: string }> | null;
+  created_at?: string;
+  updated_at?: string;
+}): StudentRecord {
+  let parentContacts: Array<{ name: string; relationship: string; phone: string }> | null = null;
+  if (backendStudent.parent_contacts) {
+    if (Array.isArray(backendStudent.parent_contacts)) {
+      parentContacts = backendStudent.parent_contacts;
+    } else if (typeof backendStudent.parent_contacts === 'string') {
+      try {
+        parentContacts = JSON.parse(backendStudent.parent_contacts || '[]');
+      } catch {
+        parentContacts = [];
+      }
+    }
+  }
+
+  return {
+    id: backendStudent.id,
+    first_name: backendStudent.first_name,
+    last_name: backendStudent.last_name,
+    class_id: backendStudent.class_id,
+    class_uuid: backendStudent.class_uuid,
+    admission_number: backendStudent.admission_number,
+    date_of_birth: backendStudent.date_of_birth,
+    parent_contacts: parentContacts,
+    created_at: backendStudent.created_at,
+    updated_at: backendStudent.updated_at
+  };
 }
 
 export interface Subject {
@@ -779,6 +1089,28 @@ export interface PlatformSchool {
   userCount: number;
 }
 
+export interface PlatformUserSummary {
+  id: string;
+  email: string;
+  username: string | null;
+  fullName: string | null;
+  role: Role;
+  tenantId: string | null;
+  tenantName: string | null;
+  schoolId: string | null;
+  schoolName: string | null;
+  registrationCode: string | null;
+  isVerified: boolean;
+  status: UserStatus | null;
+  auditLogEnabled: boolean;
+  isTeachingStaff: boolean;
+  createdAt: string;
+  gender: string | null;
+  dateOfBirth: string | null;
+  enrollmentDate: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
 export interface CreateSchoolPayload {
   name: string;
   address: string;
@@ -948,6 +1280,14 @@ export const api = {
         class_id: params.classId
       })}`
     ),
+  getAttendanceAggregate: (filters?: { from?: string; to?: string; classId?: string }) =>
+    apiFetch<AttendanceAggregate[]>(
+      `/reports/attendance${buildQuery({
+        from: filters?.from,
+        to: filters?.to,
+        class_id: filters?.classId
+      })}`
+    ),
   getGradeReport: (examId: string) =>
     apiFetch<GradeAggregate[]>(`/reports/grades${buildQuery({ exam_id: examId })}`),
   getFeeReport: (status?: string) =>
@@ -1052,9 +1392,53 @@ export const api = {
   },
 
   // RBAC
-  listUsers: () => apiFetch<TenantUser[]>('/users'),
-  listTeachers: () => apiFetch<TeacherProfile[]>('/teachers'),
-  listStudents: () => apiFetch<StudentRecord[]>('/students'),
+  listUsers: async () => {
+    const response = await apiFetch<PaginatedResponse<TenantUser> | TenantUser[]>('/users');
+    return extractPaginatedData(response);
+  },
+  listTeachers: async () => {
+    const response = await apiFetch<PaginatedResponse<TeacherProfile> | TeacherProfile[]>('/teachers');
+    const teachers = extractPaginatedData(response);
+    return teachers.map(transformTeacher);
+  },
+  getTeacher: async (id: string) => {
+    const teacher = await apiFetch<TeacherProfile>(`/teachers/${id}`);
+    return transformTeacher(teacher);
+  },
+  updateTeacher: (id: string, payload: { name?: string; email?: string; subjects?: string[]; assignedClasses?: string[] }) =>
+    apiFetch<TeacherProfile>(`/teachers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }).then(transformTeacher),
+  deleteTeacher: (id: string) =>
+    apiFetch<void>(`/teachers/${id}`, {
+      method: 'DELETE'
+    }),
+  listStudents: async () => {
+    const response = await apiFetch<PaginatedResponse<StudentRecord> | StudentRecord[]>('/students');
+    const students = extractPaginatedData(response);
+    return students.map(transformStudent);
+  },
+  getStudent: async (id: string) => {
+    const student = await apiFetch<StudentRecord>(`/students/${id}`);
+    return transformStudent(student);
+  },
+  updateStudent: (id: string, payload: {
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+    classId?: string;
+    admissionNumber?: string;
+    parentContacts?: Array<{ name: string; relationship: string; phone: string }>;
+  }) =>
+    apiFetch<StudentRecord>(`/students/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }).then(transformStudent),
+  deleteStudent: (id: string) =>
+    apiFetch<void>(`/students/${id}`, {
+      method: 'DELETE'
+    }),
   getSchool: () =>
     apiFetch<{ id: string; name: string; address: Record<string, unknown> } | null>('/school'),
   updateUserRole: (userId: string, role: Role) =>
@@ -1119,10 +1503,46 @@ export const api = {
         method: 'DELETE'
       }),
     createSchoolAdmin: (id: string, payload: CreateSchoolAdminPayload) =>
-      apiFetch(`/superuser/schools/${id}/admins`, {
+      apiFetch<{
+        id: string;
+        email: string;
+        role: 'admin';
+        tenant_id: string;
+        created_at: string;
+        username: string | null;
+        full_name: string | null;
+      }>(`/superuser/schools/${id}/admins`, {
         method: 'POST',
         body: JSON.stringify(payload)
-      })
+      }),
+    listUsers: () => apiFetch<PlatformUserSummary[]>('/superuser/users'),
+    getTenantAnalytics: (tenantId: string) =>
+      apiFetch<{
+        tenantId: string;
+        name: string;
+        createdAt: Date;
+        userCount: number;
+        teacherCount: number;
+        studentCount: number;
+        classCount: number;
+        recentActivity: {
+          attendanceRecords: number;
+          exams: number;
+        };
+      }>(`/superuser/analytics/tenant/${tenantId}`),
+    getUsage: (tenantId?: string) => {
+      const params = tenantId ? `?tenantId=${tenantId}` : '';
+      return apiFetch<{
+        tenantId?: string;
+        activeUsers?: number;
+        storageUsed?: number;
+        apiCalls?: number;
+        lastActivity?: string;
+        totalActiveUsers?: number;
+        totalStorage?: number;
+        totalApiCalls?: number;
+      }>(`/superuser/usage${params}`);
+    }
   },
   admin: {
     listSubjects: () => apiFetch<Subject[]>('/admin/subjects'),
@@ -1200,5 +1620,95 @@ export const api = {
       }),
     getMessages: () => apiFetch<TeacherMessage[]>('/teacher/messages'),
     getProfile: () => apiFetch<TeacherProfileDetail>('/teacher/profile')
+  },
+  // Audit and activity endpoints
+  getActivityHistory: (userId?: string) => {
+    const params = userId ? `?userId=${userId}` : '';
+    return apiFetch<Array<{
+      id: string;
+      action: string;
+      description: string;
+      timestamp: string;
+      metadata: Record<string, unknown>;
+    }>>(`/audit/activity${params}`);
+  },
+  getAuditLogs: (userId?: string, filters?: {
+    entityType?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (userId) searchParams.set('userId', userId);
+    if (filters?.entityType) searchParams.set('entityType', filters.entityType);
+    if (filters?.from) searchParams.set('from', filters.from);
+    if (filters?.to) searchParams.set('to', filters.to);
+    if (filters?.limit) searchParams.set('limit', String(filters.limit));
+    const params = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return apiFetch<AuditLogEntry[]>(`/audit/logs${params}`);
+  },
+  // Search
+  search: (query: string, options?: { limit?: number; types?: ('student' | 'teacher' | 'class' | 'subject')[] }) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', query);
+    if (options?.limit) searchParams.set('limit', String(options.limit));
+    if (options?.types) searchParams.set('types', options.types.join(','));
+    return apiFetch<{
+      results: Array<{
+        type: 'student' | 'teacher' | 'class' | 'subject';
+        id: string;
+        title: string;
+        subtitle?: string;
+        metadata?: Record<string, unknown>;
+      }>;
+    }>(`/search?${searchParams.toString()}`);
+  },
+  // Notifications
+  notifications: {
+    list: (limit?: number) => {
+      const params = limit ? `?limit=${limit}` : '';
+      return apiFetch<{
+        notifications: Array<{
+          id: string;
+          userId: string;
+          title: string;
+          message: string;
+          type: 'info' | 'success' | 'warning' | 'error';
+          read: boolean;
+          createdAt: string;
+          metadata?: Record<string, unknown>;
+        }>;
+      }>(`/notifications${params}`);
+    },
+    markAsRead: (notificationId: string) =>
+      apiFetch<void>(`/notifications/${notificationId}/read`, {
+        method: 'POST'
+      }),
+    markAllAsRead: () =>
+      apiFetch<{ marked: number }>('/notifications/read-all', {
+        method: 'POST'
+      })
+  },
+  // Department Analytics
+  getDepartmentAnalytics: (departmentId?: string) => {
+    const params = departmentId ? `?department_id=${departmentId}` : '';
+    return apiFetch<{
+      departmentId?: string;
+      totalTeachers: number;
+      totalStudents: number;
+      averageClassSize: number;
+    }>(`/reports/department-analytics${params}`);
   }
 };
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  userId: string | null;
+  userEmail: string | null;
+  timestamp: string;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+}

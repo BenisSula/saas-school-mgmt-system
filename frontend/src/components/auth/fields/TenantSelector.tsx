@@ -29,6 +29,8 @@ export function TenantSelector({
   const [selectedTenant, setSelectedTenant] = useState<TenantLookupResult | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Load initial list of recent schools on mount
   useEffect(() => {
@@ -40,6 +42,7 @@ export function TenantSelector({
       } catch (err) {
         console.error('[TenantSelector] Failed to load initial schools:', err);
         // Don't show error - just continue without initial list
+        setInitialSchools([]);
       } finally {
         setIsLoadingInitial(false);
       }
@@ -123,8 +126,15 @@ export function TenantSelector({
       }
     } catch (err) {
       console.error('[TenantSelector] Search error:', err);
-      setSearchError('Failed to search for school. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      // Check if it's a network/connectivity error
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network')) {
+        setSearchError('Cannot connect to server. Please check your connection and try again.');
+      } else {
+        setSearchError('Failed to search for school. Please try again.');
+      }
       setSearchResults([]);
+      setShowDropdown(false);
     } finally {
       setIsSearching(false);
     }
@@ -183,6 +193,7 @@ export function TenantSelector({
     }
   };
 
+  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
@@ -190,6 +201,37 @@ export function TenantSelector({
       }
     };
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showDropdown]);
+
+  // Handle Escape key to close dropdown
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showDropdown) {
+        setShowDropdown(false);
+        inputRef.current?.blur();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showDropdown]);
 
   const handleSelectTenant = (tenant: TenantLookupResult) => {
     setSelectedTenant(tenant);
@@ -209,7 +251,7 @@ export function TenantSelector({
   const inputClasses = `${baseInputClasses} ${inputStateClasses}`;
 
   return (
-    <div className={`space-y-2 ${containerClassName}`}>
+    <div ref={containerRef} className={`space-y-2 ${containerClassName}`}>
       <label className="block text-sm font-semibold text-[var(--brand-surface-contrast)]">
         School/Institution
         {required && <span className="ml-1 text-red-600 dark:text-red-400">*</span>}
@@ -280,6 +322,7 @@ export function TenantSelector({
           aria-hidden="true"
         />
         <input
+          ref={inputRef}
           type="text"
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}

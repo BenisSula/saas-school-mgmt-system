@@ -4,6 +4,7 @@ import tenantResolver from '../middleware/tenantResolver';
 import { requirePermission } from '../middleware/rbac';
 import {
   getAttendanceSummary,
+  getDepartmentAnalytics,
   getGradeDistribution,
   getFeeOutstanding
 } from '../services/reportService';
@@ -53,6 +54,19 @@ router.get('/fees', requirePermission('fees:manage'), async (req, res, next) => 
     const { status } = req.query as Record<string, string | undefined>;
     const fees = await getFeeOutstanding(req.tenantClient, req.tenant.schema, status);
     res.json(fees);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/department-analytics', requirePermission('department-analytics'), async (req, res, next) => {
+  try {
+    if (!req.tenant || !req.tenantClient) {
+      return res.status(500).json({ message: 'Tenant context missing' });
+    }
+    const { department_id: departmentId } = req.query as Record<string, string | undefined>;
+    const analytics = await getDepartmentAnalytics(req.tenantClient, req.tenant.schema, departmentId);
+    res.json(analytics);
   } catch (error) {
     next(error);
   }

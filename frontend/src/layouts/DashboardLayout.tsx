@@ -153,7 +153,7 @@ function DashboardLayoutContent({
           role="main"
           aria-labelledby={titleId || undefined}
           tabIndex={-1}
-          className="relative z-10 flex-1 overflow-x-hidden overflow-y-auto py-6 px-2 sm:px-4 lg:px-6"
+          className="relative z-10 flex-1 overflow-x-hidden overflow-y-auto container-padding scrollbar-thin"
         >
           <div className="mx-auto w-full max-w-full">
             <Suspense fallback={<DashboardSkeleton />}>{content}</Suspense>

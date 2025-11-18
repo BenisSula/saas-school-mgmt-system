@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { FormEvent } from 'react';
 import { api, type Invoice, type StudentRecord } from '../lib/api';
+import { defaultDate, formatDate } from '../lib/utils/date';
 import { Table } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
 import { DatePicker } from '../components/ui/DatePicker';
@@ -21,7 +22,7 @@ export function AdminInvoicePage() {
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [studentId, setStudentId] = useState('');
-  const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dueDate, setDueDate] = useState(() => defaultDate());
   const [items, setItems] = useState<DraftItem[]>([{ description: '', amount: 0 }]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -137,7 +138,7 @@ export function AdminInvoicePage() {
         header: 'Due Date',
         key: 'due_date' as const,
         render: (row: Invoice) =>
-          row.due_date ? new Date(row.due_date).toLocaleDateString() : 'N/A'
+          row.due_date ? formatDate(row.due_date) : 'N/A'
       }
     ],
     []

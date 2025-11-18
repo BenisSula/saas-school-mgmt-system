@@ -39,7 +39,7 @@ describe('Authentication & RBAC', () => {
     tenantId = tenantResult.rows[0].id;
   });
 
-  it('allows signup, login, refresh, and access to protected route', async () => {
+    it('allows signup, login, refresh, and access to protected route', async () => {
     const email = 'admin@testacademy.com';
     const password = 'StrongPassw0rd!';
 
@@ -83,6 +83,30 @@ describe('Authentication & RBAC', () => {
     expect(refreshResponse.body).toHaveProperty('refreshToken');
   });
 
+    it('preserves active status during refresh flows', async () => {
+      const email = 'refresh-status@testacademy.com';
+      const password = 'StrongPassw0rd!';
+
+      const signupResponse = await request(app).post('/auth/signup').send({
+        email,
+        password,
+        role: 'admin',
+        tenantId
+      });
+
+      expect(signupResponse.status).toBe(201);
+
+      const loginResponse = await request(app).post('/auth/login').send({ email, password });
+      expect(loginResponse.status).toBe(200);
+
+      const refreshResponse = await request(app).post('/auth/refresh').send({
+        refreshToken: loginResponse.body.refreshToken
+      });
+
+      expect(refreshResponse.status).toBe(200);
+      expect(refreshResponse.body.user.status).toBe('active');
+    });
+
   it('blocks users without permission from protected route', async () => {
     const email = 'student@testacademy.com';
     const password = 'StrongPassw0rd!';
@@ -111,4 +135,30 @@ describe('Authentication & RBAC', () => {
 
     expect(protectedResponse.status).toBe(403);
   });
+
+    it('falls back to active status when legacy records have null status', async () => {
+      const email = 'legacy-status@testacademy.com';
+      const password = 'StrongPassw0rd!';
+
+      const signupResponse = await request(app).post('/auth/signup').send({
+        email,
+        password,
+        role: 'admin',
+        tenantId
+      });
+
+      expect(signupResponse.status).toBe(201);
+
+      await pool.query('ALTER TABLE shared.users ALTER COLUMN status DROP NOT NULL');
+      await pool.query('UPDATE shared.users SET status = NULL WHERE email = $1', [email.toLowerCase()]);
+
+      try {
+        const loginResponse = await request(app).post('/auth/login').send({ email, password });
+        expect(loginResponse.status).toBe(200);
+        expect(loginResponse.body.user.status).toBe('active');
+      } finally {
+        await pool.query('UPDATE shared.users SET status = $1 WHERE status IS NULL', ['active']);
+        await pool.query('ALTER TABLE shared.users ALTER COLUMN status SET NOT NULL');
+      }
+    });
 });

@@ -3,6 +3,8 @@ import authenticate from '../middleware/authenticate';
 import tenantResolver from '../middleware/tenantResolver';
 import ensureTenantContext from '../middleware/ensureTenantContext';
 import { requirePermission } from '../middleware/rbac';
+import { validateInput } from '../middleware/validateInput';
+import { createPaginatedResponse } from '../middleware/pagination';
 import { listTenantUsers, updateTenantUserRole, updateUserStatus } from '../services/userService';
 import { processPendingProfile, cleanupPendingProfile } from '../services/profileService';
 import { adminCreateUser } from '../services/adminUserService';
@@ -37,22 +39,17 @@ const adminCreateUserSchema = z.object({
 });
 
 // Admin endpoint: Create new user with profile
-router.post('/register', requirePermission('users:manage'), async (req, res, next) => {
+router.post('/register', requirePermission('users:manage'), validateInput(adminCreateUserSchema, 'body'), async (req, res, next) => {
   try {
     if (!req.user || !req.tenant || !req.tenantClient) {
       return res.status(500).json({ message: 'User or tenant context missing' });
-    }
-
-    const parsed = adminCreateUserSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.message });
     }
 
     const result = await adminCreateUser(
       req.tenant.id,
       req.tenantClient,
       req.tenant.schema,
-      parsed.data,
+      req.body,
       req.user.id
     );
 
@@ -71,6 +68,7 @@ router.get('/', requirePermission('users:manage'), async (req, res, next) => {
     if (!req.tenant) {
       return res.status(400).json({ message: 'Tenant context required' });
     }
+    const pagination = req.pagination!;
     const { status, role } = req.query;
     const filters: { status?: string; role?: string } = {};
     if (status && typeof status === 'string') {
@@ -79,8 +77,13 @@ router.get('/', requirePermission('users:manage'), async (req, res, next) => {
     if (role && typeof role === 'string') {
       filters.role = role;
     }
-    const users = await listTenantUsers(req.tenant.id, filters);
-    res.json(users);
+    const allUsers = await listTenantUsers(req.tenant.id, filters);
+    
+    // Apply pagination
+    const paginated = allUsers.slice(pagination.offset, pagination.offset + pagination.limit);
+    const response = createPaginatedResponse(paginated, allUsers.length, pagination);
+    
+    res.json(response);
   } catch (error) {
     console.error('Error in /users route:', error);
     if (!res.headersSent) {
@@ -94,21 +97,16 @@ router.get('/', requirePermission('users:manage'), async (req, res, next) => {
   }
 });
 
-router.patch('/:userId/role', requirePermission('users:manage'), async (req, res, next) => {
+router.patch('/:userId/role', requirePermission('users:manage'), validateInput(roleUpdateSchema, 'body'), async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(500).json({ message: 'User context missing' });
     }
 
-    const parsed = roleUpdateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.message });
-    }
-
     const updated = await updateTenantUserRole(
       req.tenant!.id,
       req.params.userId,
-      parsed.data.role,
+      req.body.role,
       req.user.id
     );
 

@@ -8,6 +8,7 @@ import {
   type TeacherClassRosterEntry,
   type TeacherClassSummary
 } from '../lib/api';
+import { defaultDate } from '../lib/utils/date';
 import { DatePicker } from '../components/ui/DatePicker';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
@@ -21,9 +22,7 @@ interface AttendanceRow {
   status: AttendanceStatus;
 }
 
-function defaultDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+// Using shared defaultDate from utils
 
 export function TeacherAttendancePage() {
   const { user } = useAuth();

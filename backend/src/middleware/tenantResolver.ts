@@ -74,13 +74,24 @@ export function tenantResolver(options: TenantResolverOptions = {}) {
       return next();
     }
 
+    // Priority order for tenant resolution:
+    // 1. JWT token tenantId (for admins and other tenant-scoped users)
+    // 2. x-tenant-id header
+    // 3. Host header
+    const jwtTenantId = req.user?.tenantId;
     const headerTenant = req.header('x-tenant-id');
     const hostTenant = extractHostTenant(req.headers.host);
-    const identifier = headerTenant ?? hostTenant;
+    const identifier = jwtTenantId || headerTenant || hostTenant;
 
     if (!identifier || identifier === '') {
       if (optional || isSuperadmin) {
         return next();
+      }
+      // For non-superadmin users, tenant context is required
+      if (req.user && !isSuperadmin) {
+        return res.status(403).json({
+          message: 'Tenant context required. Please ensure you are assigned to a tenant.'
+        });
       }
       return res.status(400).json({ message: 'Tenant context missing' });
     }

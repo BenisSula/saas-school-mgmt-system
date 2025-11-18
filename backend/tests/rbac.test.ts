@@ -1,6 +1,6 @@
 import crypto from 'crypto';
-import type { Request, Response, NextFunction } from 'express';
-import type { Pool } from 'pg';
+import type { Response, NextFunction } from 'express';
+import type { Pool, PoolClient } from 'pg';
 import { createTestPool } from './utils/testDb';
 import { getPool } from '../src/db/connection';
 import { requirePermission, requireRole, requireSelfOrPermission } from '../src/middleware/rbac';
@@ -15,6 +15,7 @@ const mockedGetPool = getPool as unknown as jest.Mock;
 
 describe('RBAC Middleware Unit Tests', () => {
   let pool: Pool;
+  let tenantClient: PoolClient;
   let mockReq: Partial<AuthenticatedRequest>;
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
@@ -27,17 +28,18 @@ describe('RBAC Middleware Unit Tests', () => {
     // Create tenant for audit logs
     await pool.query(
       `
-        INSERT INTO shared.tenants (name, domain, schema_name)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (schema_name) DO NOTHING
-      `,
+          INSERT INTO shared.tenants (name, domain, schema_name)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (schema_name) DO NOTHING
+        `,
       ['Test Tenant', 'test.local', 'tenant_test']
     );
 
     await pool.query(`CREATE SCHEMA IF NOT EXISTS tenant_test`);
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    tenantClient = await pool.connect();
     mockReq = {
       user: {
         id: crypto.randomUUID(),
@@ -46,7 +48,7 @@ describe('RBAC Middleware Unit Tests', () => {
         email: 'test@example.com',
         tokenId: 'token123'
       },
-      tenantClient: pool.connect() as any,
+      tenantClient,
       tenant: {
         id: crypto.randomUUID(),
         name: 'Test Tenant',
@@ -68,11 +70,21 @@ describe('RBAC Middleware Unit Tests', () => {
     mockNext = jest.fn();
   });
 
+  afterEach(() => {
+    if (tenantClient) {
+      tenantClient.release();
+    }
+  });
+
   describe('requirePermission', () => {
     it('allows access when user has required permission', () => {
       mockReq.user!.role = 'teacher';
       // Teachers have 'attendance:mark' permission
-      requirePermission('attendance:mark')(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      requirePermission('attendance:mark')(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -80,7 +92,11 @@ describe('RBAC Middleware Unit Tests', () => {
 
     it('denies access when user lacks required permission', () => {
       mockReq.user!.role = 'student';
-      requirePermission('attendance:manage')(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      requirePermission('attendance:manage')(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Forbidden' });
@@ -89,7 +105,11 @@ describe('RBAC Middleware Unit Tests', () => {
 
     it('denies access when user is undefined', () => {
       mockReq.user = undefined;
-      requirePermission('attendance:manage')(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      requirePermission('attendance:manage')(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Forbidden' });
@@ -98,14 +118,22 @@ describe('RBAC Middleware Unit Tests', () => {
 
     it('allows admin to access admin-only permissions', () => {
       mockReq.user!.role = 'admin';
-      requirePermission('users:manage')(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      requirePermission('users:manage')(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockNext).toHaveBeenCalled();
     });
 
     it('allows superadmin to access all permissions', () => {
       mockReq.user!.role = 'superadmin';
-      requirePermission('tenants:manage')(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      requirePermission('tenants:manage')(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockNext).toHaveBeenCalled();
     });
@@ -114,7 +142,11 @@ describe('RBAC Middleware Unit Tests', () => {
   describe('requireRole', () => {
     it('allows access when user has required role', async () => {
       mockReq.user!.role = 'teacher';
-      await requireRole(['teacher'])(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      await requireRole(['teacher'])(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockNext).toHaveBeenCalled();
       expect(mockRes.status).not.toHaveBeenCalled();
@@ -122,7 +154,11 @@ describe('RBAC Middleware Unit Tests', () => {
 
     it('denies access when user lacks required role', async () => {
       mockReq.user!.role = 'student';
-      await requireRole(['teacher', 'admin'])(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      await requireRole(['teacher', 'admin'])(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockRes.status).toHaveBeenCalledWith(403);
       expect(mockNext).not.toHaveBeenCalled();
@@ -137,7 +173,11 @@ describe('RBAC Middleware Unit Tests', () => {
 
     it('denies access when user is undefined', async () => {
       mockReq.user = undefined;
-      await requireRole(['teacher'])(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      await requireRole(['teacher'])(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({ message: 'Unauthenticated' });
@@ -146,7 +186,11 @@ describe('RBAC Middleware Unit Tests', () => {
 
     it('allows access when user role matches any allowed role', async () => {
       mockReq.user!.role = 'hod';
-      await requireRole(['teacher', 'hod', 'admin'])(mockReq as AuthenticatedRequest, mockRes as Response, mockNext);
+      await requireRole(['teacher', 'hod', 'admin'])(
+        mockReq as AuthenticatedRequest,
+        mockRes as Response,
+        mockNext
+      );
 
       expect(mockNext).toHaveBeenCalled();
     });
@@ -287,4 +331,3 @@ describe('RBAC Middleware Unit Tests', () => {
     });
   });
 });
-

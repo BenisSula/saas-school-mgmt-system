@@ -17,16 +17,16 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     if (error) describedBy.push(errorId);
 
     const baseClasses =
-      'block w-full rounded-md border bg-slate-950 text-slate-100 placeholder:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 transition-colors duration-150';
+      'block w-full rounded-lg border bg-[var(--brand-surface)] text-[var(--brand-text-primary)] placeholder:text-[var(--brand-muted)] focus-visible-ring transition-all duration-200 px-3 py-2 text-sm sm:text-base';
 
     const fieldClasses = error
-      ? 'border-red-500 focus-visible:outline-red-500'
-      : 'border-[var(--brand-border)] focus-visible:outline-[var(--brand-primary)]';
+      ? 'border-[var(--brand-error)] focus-visible:ring-[var(--brand-error)]'
+      : 'border-[var(--brand-border)] focus-visible:ring-[var(--brand-primary)] hover:border-[var(--brand-border-strong)]';
 
     return (
-      <div className={`flex flex-col gap-1 ${className}`}>
+      <div className={`flex flex-col gap-1.5 ${className}`}>
         {label ? (
-          <label htmlFor={inputId} className="text-sm font-medium text-slate-200">
+          <label htmlFor={inputId} className="text-sm font-medium text-[var(--brand-text-primary)]">
             {label}
           </label>
         ) : null}
@@ -39,12 +39,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {helperText ? (
-          <p id={helperId} className="text-xs text-slate-400">
+          <p id={helperId} className="text-xs text-[var(--brand-muted)]">
             {helperText}
           </p>
         ) : null}
         {error ? (
-          <p id={errorId} className="text-xs text-red-400" role="alert">
+          <p id={errorId} className="text-xs text-[var(--brand-error)]" role="alert">
             {error}
           </p>
         ) : null}

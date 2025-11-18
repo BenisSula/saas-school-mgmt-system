@@ -18,11 +18,7 @@ import {
   rotateSessionToken,
   SessionContext
 } from './platformMonitoringService';
-import {
-  createSchemaSlug,
-  runTenantMigrations,
-  seedTenant
-} from '../db/tenantManager';
+import { createSchemaSlug, runTenantMigrations, seedTenant } from '../db/tenantManager';
 import { registerUser, type UserRegistrationInput } from './userRegistrationService';
 import { validateSignupInput, normalizeSignupPayload } from './authValidation';
 
@@ -84,6 +80,10 @@ interface DbUserRow {
   status?: string | null; // May be null if migration hasn't run
 }
 
+interface ErrorWithCode extends Error {
+  code?: string;
+}
+
 async function findTenantById(pool: Pool, tenantId: string) {
   const result = await pool.query(`SELECT * FROM shared.tenants WHERE id = $1`, [tenantId]);
   return result.rows[0];
@@ -113,8 +113,8 @@ export async function signUp(input: SignUpInput): Promise<AuthResponse> {
   // Check for duplicate email
   const existing = await findUserByEmail(pool, normalizedInput.email);
   if (existing) {
-    const error = new Error('User with this email already exists');
-    (error as any).code = 'DUPLICATE_EMAIL';
+    const error: ErrorWithCode = new Error('User with this email already exists');
+    error.code = 'DUPLICATE_EMAIL';
     throw error;
   }
 
@@ -134,14 +134,14 @@ export async function signUp(input: SignUpInput): Promise<AuthResponse> {
       await client.query('BEGIN');
 
       const schemaName = createSchemaSlug(normalizedInput.tenantName);
-      
+
       // Create schema within transaction
       await client.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
-      
+
       // Run tenant migrations and seed (these use their own connections, but schema exists)
       await runTenantMigrations(pool, schemaName);
       await seedTenant(pool, schemaName);
-      
+
       // Create tenant record within transaction using the client
       const tenantId = crypto.randomUUID();
       const tenantResult = await client.query(
@@ -186,7 +186,8 @@ export async function signUp(input: SignUpInput): Promise<AuthResponse> {
   };
 
   // Determine if user should be immediately active
-  const immediateActivation: boolean = normalizedInput.role === 'admin' && !!normalizedInput.tenantName;
+  const immediateActivation: boolean =
+    normalizedInput.role === 'admin' && !!normalizedInput.tenantName;
 
   const registrationResult = await registerUser(
     resolvedTenantId,
@@ -234,7 +235,7 @@ export async function login(input: LoginInput, context?: SessionContext): Promis
   try {
     const pool = getPool();
     const normalizedEmail = input.email.toLowerCase();
-    
+
     let user: DbUserRow | undefined;
     try {
       user = await findUserByEmail(pool, normalizedEmail);
@@ -254,7 +255,7 @@ export async function login(input: LoginInput, context?: SessionContext): Promis
       console.error('[auth] Password verification error:', verifyError);
       throw new Error('Invalid credentials');
     }
-    
+
     if (!passwordValid) {
       throw new Error('Invalid credentials');
     }
@@ -263,7 +264,7 @@ export async function login(input: LoginInput, context?: SessionContext): Promis
     let accessToken: string;
     let refreshToken: string;
     let expiresAt: Date;
-    
+
     try {
       payload = buildTokenPayload(user);
       accessToken = generateAccessToken(payload);
@@ -317,14 +318,15 @@ export async function login(input: LoginInput, context?: SessionContext): Promis
     return response;
   } catch (error) {
     // Re-throw known errors
-    if (error instanceof Error && (
-      error.message.includes('Invalid credentials') ||
-      error.message.includes('Database error') ||
-      error.message.includes('Failed to generate')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('Invalid credentials') ||
+        error.message.includes('Database error') ||
+        error.message.includes('Failed to generate'))
+    ) {
       throw error;
     }
-    
+
     // Log unexpected errors
     console.error('[auth] Unexpected login error:', error);
     throw new Error('An unexpected error occurred during login');

@@ -1,5 +1,7 @@
 import { isValidElement, memo, type CSSProperties, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import { useBrand } from './BrandProvider';
+import { fadeIn, staggerContainer, staggerItem } from '../../lib/utils/animations';
 
 export interface TableColumn<T> {
   key?: keyof T | string;
@@ -26,35 +28,44 @@ function TableComponent<T>({
   const { tokens } = useBrand();
   if (data.length === 0) {
     return (
-      <div className="rounded-md border border-slate-800 bg-slate-900/70 p-6 text-center text-sm text-slate-400">
-        {emptyMessage}
-      </div>
+      <motion.div
+        className="card-base p-6 sm:p-8 text-center"
+        variants={fadeIn}
+        initial="hidden"
+        animate="visible"
+      >
+        <p className="text-sm text-[var(--brand-muted)]">{emptyMessage}</p>
+      </motion.div>
     );
   }
 
   return (
-    <div
-      className="overflow-hidden rounded-md border border-slate-800 shadow-sm"
+    <motion.div
+      className="overflow-hidden rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)] shadow-sm"
       style={
         {
           '--brand-secondary': tokens.secondary,
           '--brand-secondary-contrast': tokens.secondaryContrast
         } as CSSProperties
       }
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
     >
-      <table className="min-w-full divide-y divide-slate-800 text-left text-sm text-slate-200">
+      <div className="overflow-x-auto scrollbar-thin">
+        <table className="min-w-full divide-y divide-[var(--brand-border)] text-left text-sm">
         {caption ? (
-          <caption className="bg-slate-900/80 px-4 py-3 text-left text-xs uppercase tracking-wide text-slate-400">
+          <caption className="bg-[var(--brand-surface-secondary)] px-4 py-3 text-left text-xs uppercase tracking-wide text-[var(--brand-muted)]">
             {caption}
           </caption>
         ) : null}
-        <thead className="bg-[var(--brand-secondary)] text-[var(--brand-secondary-contrast)]">
+        <thead className="bg-[var(--brand-surface-secondary)]">
           <tr>
             {columns.map((column, columnIndex) => (
               <th
                 key={column.key ? String(column.key) : `header-${columnIndex}`}
                 scope="col"
-                className={`px-4 py-3 font-semibold uppercase tracking-wide text-xs ${
+                className={`px-3 py-3 font-semibold uppercase tracking-wide text-xs text-[var(--brand-text-primary)] sm:px-4 ${
                   column.align === 'center'
                     ? 'text-center'
                     : column.align === 'right'
@@ -67,12 +78,20 @@ function TableComponent<T>({
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800 bg-slate-950/40">
+        <motion.tbody
+          className="divide-y divide-[var(--brand-border)] bg-[var(--brand-surface)]"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {data.map((row, rowIndex) => (
-            <tr
+            <motion.tr
               key={rowIndex}
-              className={`hover:bg-slate-900/70 ${
-                onRowClick ? 'cursor-pointer focus-within:bg-slate-900/70' : ''
+              variants={staggerItem}
+              className={`transition-colors duration-150 ${
+                onRowClick
+                  ? 'cursor-pointer hover:bg-[var(--brand-surface-secondary)] focus-within:bg-[var(--brand-surface-secondary)] touch-target'
+                  : 'hover:bg-[var(--brand-surface-secondary)]/50'
               }`}
               onClick={() => {
                 if (onRowClick) {
@@ -95,7 +114,7 @@ function TableComponent<T>({
                 return (
                   <td
                     key={key}
-                    className={`px-4 py-3 ${
+                    className={`px-3 py-3 text-[var(--brand-text-primary)] sm:px-4 ${
                       column.align === 'center'
                         ? 'text-center'
                         : column.align === 'right'
@@ -115,11 +134,12 @@ function TableComponent<T>({
                   </td>
                 );
               })}
-            </tr>
+            </motion.tr>
           ))}
-        </tbody>
+        </motion.tbody>
       </table>
-    </div>
+      </div>
+    </motion.div>
   );
 }
 

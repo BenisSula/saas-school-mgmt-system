@@ -53,7 +53,7 @@ function SidebarComponent({
         isDesktop
           ? 'sticky top-[var(--layout-header-height)] h-[calc(100vh-var(--layout-header-height))]'
           : 'fixed inset-y-0 left-0 z-50 h-screen'
-      } flex-shrink-0 overflow-hidden border-r border-[var(--brand-border)] bg-[var(--brand-surface)]/95 shadow-xl backdrop-blur`}
+      } flex-shrink-0 overflow-hidden border-r border-[var(--brand-border)] bg-[var(--brand-surface)]/95 shadow-xl backdrop-blur transition-colors duration-300`}
       aria-hidden={!open && !isDesktop}
       data-collapsed={shouldCollapse}
       animate={shouldCollapse ? 'collapsed' : 'expanded'}
@@ -66,10 +66,14 @@ function SidebarComponent({
       }}
     >
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b border-[var(--brand-border)] px-4 py-3 lg:px-5">
-          <span className="text-sm font-semibold text-[var(--brand-surface-contrast)]">
+        <div className="flex items-center justify-between border-b border-[var(--brand-border)] px-3 py-3 sm:px-4 lg:px-5">
+          <motion.span
+            className="text-sm font-semibold text-[var(--brand-surface-contrast)]"
+            animate={{ opacity: shouldCollapse ? 0.7 : 1 }}
+            transition={{ duration: 0.2 }}
+          >
             {shouldCollapse ? 'Menu' : 'Navigation'}
-          </span>
+          </motion.span>
           {isDesktop ? (
             <button {...collapseButtonProps}>
               {collapsed ? (
@@ -91,7 +95,7 @@ function SidebarComponent({
         </div>
 
         <nav
-          className="flex flex-1 flex-col overflow-y-auto px-2 py-4 text-sm text-[var(--brand-surface-contrast)] lg:px-3"
+          className="flex flex-1 flex-col overflow-y-auto px-2 py-4 text-sm text-[var(--brand-surface-contrast)] scrollbar-thin lg:px-3"
           role="navigation"
           aria-label="Sidebar navigation"
         >
@@ -116,10 +120,10 @@ function SidebarComponent({
                         onClose();
                       }
                     }}
-                    className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] ${
+                    className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 touch-target focus-visible-ring ${
                       isActive
                         ? 'bg-[var(--brand-primary)]/90 text-[var(--brand-primary-contrast)] shadow-sm'
-                        : 'hover:bg-white/10'
+                        : 'hover:bg-[var(--brand-surface-secondary)] active:bg-[var(--brand-surface-tertiary)]'
                     }`}
                     title={shouldCollapse ? link.label : undefined}
                   >
