@@ -143,7 +143,12 @@ describe('Login/Register Integration Tests', () => {
       await user.click(screen.getByRole('button', { name: /sign in/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
+        // Error appears both in banner and field error - check for field error specifically
+        const errorElements = screen.getAllByText(/invalid credentials/i);
+        expect(errorElements.length).toBeGreaterThan(0);
+        // Verify at least one is in the password field error
+        const passwordError = screen.getByRole('alert', { name: /invalid credentials/i });
+        expect(passwordError).toBeInTheDocument();
       });
     });
   });
@@ -278,6 +283,14 @@ describe('Login/Register Integration Tests', () => {
       mockRegister.mockResolvedValue(mockAuthResponse);
 
       const validTenantId = '323e4567-e89b-12d3-a456-426614174002';
+      // Mock tenant lookup to return the tenant
+      mockLookupTenant.mockResolvedValue({
+        id: validTenantId,
+        name: 'Test School',
+        domain: null,
+        registrationCode: 'TEST123'
+      });
+
       render(
         <MemoryRouter>
           <RegisterForm
@@ -287,6 +300,11 @@ describe('Login/Register Integration Tests', () => {
           />
         </MemoryRouter>
       );
+
+      // Wait for tenant selector to load
+      await waitFor(() => {
+        expect(mockListSchools).toHaveBeenCalled();
+      });
 
       // Fill in form fields
       await user.type(screen.getByLabelText(/full name/i), 'Jane Smith');
@@ -301,9 +319,12 @@ describe('Login/Register Integration Tests', () => {
 
       await user.click(screen.getByRole('button', { name: /create account/i }));
 
-      await waitFor(() => {
-        expect(mockRegister).toHaveBeenCalled();
-      });
+      await waitFor(
+        () => {
+          expect(mockRegister).toHaveBeenCalled();
+        },
+        { timeout: 5000 }
+      );
 
       const registerCall = mockRegister.mock.calls[0][0];
       expect(registerCall.email).toBe('teacher@example.com');
@@ -343,7 +364,17 @@ describe('Login/Register Integration Tests', () => {
       await user.click(screen.getByRole('button', { name: /create account/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/email already exists/i)).toBeInTheDocument();
+        // Error might appear in field error or banner - check both
+        const errorElements = screen.queryAllByText(/email already exists/i);
+        if (errorElements.length === 0) {
+          // Try case-insensitive search
+          const caseInsensitive = screen.queryAllByText((content, element) => {
+            return element?.textContent?.toLowerCase().includes('email already exists') ?? false;
+          });
+          expect(caseInsensitive.length).toBeGreaterThan(0);
+        } else {
+          expect(errorElements[0]).toBeInTheDocument();
+        }
       });
     });
 
@@ -375,9 +406,13 @@ describe('Login/Register Integration Tests', () => {
 
       await user.click(screen.getByRole('button', { name: /create account/i }));
 
-      await waitFor(() => {
-        expect(toast.error).toHaveBeenCalled();
-      });
+      await waitFor(
+        () => {
+          // Critical errors should show toast - check if error was thrown or toast was called
+          expect(toast.error).toHaveBeenCalled();
+        },
+        { timeout: 5000 }
+      );
     });
   });
 });

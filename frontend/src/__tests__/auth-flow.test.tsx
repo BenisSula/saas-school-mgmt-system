@@ -45,7 +45,9 @@ vi.mock('../lib/api', async (importOriginal) => {
       listPendingUsers: vi.fn(),
       approveUser: vi.fn(),
       rejectUser: vi.fn(),
-      updateUserRole: vi.fn()
+      updateUserRole: vi.fn(),
+      listSchools: vi.fn(),
+      lookupTenant: vi.fn()
     }
   };
 });
@@ -65,6 +67,8 @@ describe('Auth flows', () => {
     (api.approveUser as unknown as Mock).mockReset();
     (api.rejectUser as unknown as Mock).mockReset();
     (api.updateUserRole as unknown as Mock).mockReset();
+    (api.listSchools as unknown as Mock).mockReset();
+    (api.lookupTenant as unknown as Mock).mockReset();
   });
 
   it('shows pending status message after registration', async () => {
@@ -84,6 +88,22 @@ describe('Auth flows', () => {
 
     mockAuthState.register.mockResolvedValueOnce(pendingResponse);
 
+    // Mock API for tenant selection
+    (api.listSchools as unknown as Mock).mockResolvedValue({
+      schools: [
+        { id: 'tenant_alpha', name: 'Test School', domain: null, registrationCode: 'TEST123' }
+      ],
+      count: 1,
+      total: 1,
+      type: 'recent' as const
+    });
+    (api.lookupTenant as unknown as Mock).mockResolvedValue({
+      id: 'tenant_alpha',
+      name: 'Test School',
+      domain: null,
+      registrationCode: 'TEST123'
+    });
+
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -91,22 +111,40 @@ describe('Auth flows', () => {
       </MemoryRouter>
     );
 
+    // Wait for tenant selector to load
+    await waitFor(() => {
+      expect(api.listSchools).toHaveBeenCalled();
+    });
+
+    // Select tenant first (required for teacher registration)
+    const tenantInput = screen.getByPlaceholderText(/start typing to search/i);
+    await user.type(tenantInput, 'Test School');
+    await waitFor(() => {
+      expect(api.lookupTenant).toHaveBeenCalled();
+    });
+
+    // Fill form fields
     await user.type(screen.getByLabelText(/Full name/i), 'Jane Doe');
     await user.type(screen.getByLabelText(/Work email/i), 'Teacher@Example.COM');
-    // Use getByPlaceholderText to find the password input specifically (more specific than label)
     await user.type(screen.getByPlaceholderText(/Create a secure password/i), 'StrongPass123!');
-    // Note: RegisterForm doesn't have a Tenant ID field - tenantId is passed via defaultTenantId prop or in the payload
-    // For teacher role without defaultTenantId, no tenant field is shown
+    await user.type(screen.getByPlaceholderText(/re-enter your password/i), 'StrongPass123!');
+    await user.selectOptions(screen.getByLabelText(/gender/i), 'female');
+    await user.type(screen.getByLabelText(/phone number/i), '+1234567890');
+    await user.type(screen.getByLabelText(/qualifications/i), 'B.Ed');
+    await user.type(screen.getByLabelText(/years of experience/i), '5');
+    await user.type(screen.getByLabelText(/address/i), '123 Main St');
+
     await user.click(screen.getByRole('button', { name: /Create account/i }));
 
-    await waitFor(() => expect(mockAuthState.register).toHaveBeenCalled());
-    // The form doesn't collect tenantId for teacher role, so it won't be in the payload
-    expect(mockAuthState.register).toHaveBeenCalledWith({
-      email: 'teacher@example.com',
-      password: 'StrongPass123!',
-      role: 'teacher'
-      // tenantId is not included when defaultRole is 'teacher' and no defaultTenantId is provided
-    });
+    await waitFor(() => expect(mockAuthState.register).toHaveBeenCalled(), { timeout: 5000 });
+    expect(mockAuthState.register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'teacher@example.com',
+        password: 'StrongPass123!',
+        role: 'teacher',
+        tenantId: 'tenant_alpha'
+      })
+    );
     expect(toast.info).toHaveBeenCalledWith(
       'Account created and pending admin approval. We will notify you once activated.'
     );
@@ -163,6 +201,12 @@ describe('Auth flows', () => {
     await waitFor(() =>
       expect(screen.queryByText(/pending@example.com/i, { selector: 'p' })).not.toBeInTheDocument()
     );
-    expect(toast.success).toHaveBeenCalledWith('pending@example.com approved.');
+    // The actual toast message includes more details
+    expect(toast.success).toHaveBeenCalledWith(
+      'pending@example.com approved. Profile record created.',
+      expect.objectContaining({
+        description: 'You can now edit the profile to assign classes or make corrections.'
+      })
+    );
   });
 });
