@@ -4,6 +4,8 @@ import type { ApiErrorResponse } from './api';
  * Maps API error responses to field-level errors
  * Returns an object with field names as keys and error messages as values
  */
+const duplicateEmailCodes = new Set(['DUPLICATE_EMAIL', 'EMAIL_EXISTS']);
+
 export function mapApiErrorToFieldErrors(
   error: Error & { apiError?: ApiErrorResponse }
 ): Record<string, string> {
@@ -11,6 +13,7 @@ export function mapApiErrorToFieldErrors(
 
   if (error.apiError) {
     const apiError = error.apiError;
+    const normalizedCode = apiError.code ? apiError.code.toUpperCase() : undefined;
 
     // If error has a specific field, map it directly
     if (apiError.field) {
@@ -19,9 +22,12 @@ export function mapApiErrorToFieldErrors(
       // Try to infer field from error code or message
       const message = apiError.message.toLowerCase();
 
-      if (message.includes('email') || apiError.code === 'DUPLICATE_EMAIL') {
+      if (
+        message.includes('email') ||
+        (normalizedCode && duplicateEmailCodes.has(normalizedCode))
+      ) {
         fieldErrors.email = apiError.message;
-      } else if (message.includes('password') || apiError.code === 'INVALID_CREDENTIALS') {
+      } else if (message.includes('password') || normalizedCode === 'INVALID_CREDENTIALS') {
         fieldErrors.password = apiError.message;
       } else if (message.includes('role')) {
         fieldErrors.role = apiError.message;

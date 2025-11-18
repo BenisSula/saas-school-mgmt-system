@@ -57,7 +57,9 @@ export const rolePermissions: Record<Role, Permission[]> = {
     'performance:generate',
     'messages:send',
     'messages:receive',
-    'students:view_own_class'
+    'students:view_own_class',
+    'reports:view',
+    'profile:view_self'
   ],
   hod: [
     'dashboard:view',
