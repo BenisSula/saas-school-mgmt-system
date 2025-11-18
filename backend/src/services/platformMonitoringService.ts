@@ -55,7 +55,7 @@ export async function recordLoginEvent(
   if (!refreshToken) {
     return;
   }
-  
+
   try {
     const pool = getPool();
     const refreshTokenHash = hashTokenValue(refreshToken);
@@ -65,12 +65,13 @@ export async function recordLoginEvent(
     // Check if user_sessions table exists before inserting
     const tableCheck = await pool.query(`
       SELECT EXISTS (
-        SELECT FROM information_schema.tables 
+        SELECT 1
+        FROM information_schema.tables
         WHERE table_schema = 'shared' 
-        AND table_name = 'user_sessions'
+          AND table_name = 'user_sessions'
       )
     `);
-    
+
     if (tableCheck.rows[0]?.exists) {
       await pool.query(
         `
