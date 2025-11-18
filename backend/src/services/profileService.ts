@@ -1,13 +1,17 @@
-import { Pool, PoolClient } from 'pg';
+import { PoolClient } from 'pg';
 import { getPool } from '../db/connection';
 import { createStudent } from './studentService';
 import { createTeacher } from './teacherService';
-import { transformToStudentInput, transformToTeacherInput } from '../lib/profileTransformUtils';
+import {
+  transformToStudentInput,
+  transformToTeacherInput,
+  type RegistrationProfileData
+} from '../lib/profileTransformUtils';
 
 /**
  * Process pending profile data when a user is approved
  * Creates student or teacher records in the tenant schema
- * 
+ *
  * @param tenantClient - Already connected tenant database client (with search_path set)
  * @param schemaName - Tenant schema name
  * @param userId - User ID from shared.users
@@ -40,7 +44,7 @@ export async function processPendingProfile(
     }
 
     const user = userResult.rows[0];
-    const pendingProfileData = user.pending_profile_data as Record<string, unknown> | null;
+    const pendingProfileData = user.pending_profile_data as RegistrationProfileData | null;
 
     // If no profile data, nothing to process
     if (!pendingProfileData) {
@@ -51,27 +55,21 @@ export async function processPendingProfile(
 
     if (userRole === 'student' && pendingProfileData) {
       // Process student profile using shared transformation utility
-      const studentData = transformToStudentInput(
-        pendingProfileData as Record<string, unknown> as any
-      );
+      const studentData = transformToStudentInput(pendingProfileData);
       const student = await createStudent(tenantClient, schemaName, studentData);
       recordId = student.id;
     } else if (userRole === 'teacher' && pendingProfileData) {
       // Process teacher profile using shared transformation utility
-      const teacherData = transformToTeacherInput(
-        pendingProfileData as Record<string, unknown> as any,
-        userEmail
-      );
+      const teacherData = transformToTeacherInput(pendingProfileData, userEmail);
       const teacher = await createTeacher(tenantClient, schemaName, teacherData);
       recordId = teacher.id;
     }
 
     // Clear pending profile data after successful creation (for both student and teacher)
     if (recordId) {
-      await mainClient.query(
-        `UPDATE shared.users SET pending_profile_data = NULL WHERE id = $1`,
-        [userId]
-      );
+      await mainClient.query(`UPDATE shared.users SET pending_profile_data = NULL WHERE id = $1`, [
+        userId
+      ]);
     }
 
     return { success: true, recordId };
@@ -123,4 +121,3 @@ export async function cleanupPendingProfile(
     client.release();
   }
 }
-

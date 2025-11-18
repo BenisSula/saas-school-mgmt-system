@@ -301,8 +301,6 @@ export async function updateUserStatus(
       return null;
     }
 
-    const userInfo = userBeforeUpdate.rows[0];
-
     // Update status
     const updateResult = await client.query(
       `

@@ -48,10 +48,7 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
  * Transform registration profile data to StudentInput
  * Used for both immediate profile creation (admin) and pending profile processing (approval)
  */
-export function transformToStudentInput(
-  profileData: RegistrationProfileData,
-  userEmail?: string
-): StudentInput {
+export function transformToStudentInput(profileData: RegistrationProfileData): StudentInput {
   const { firstName, lastName } = splitFullName(profileData.fullName || '');
 
   return {
@@ -87,4 +84,3 @@ export function transformToTeacherInput(
     assignedClasses: [] // Can be assigned later by admin
   };
 }
-

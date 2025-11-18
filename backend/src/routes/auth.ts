@@ -21,6 +21,11 @@ import {
   getRecentSchools
 } from '../services/tenantLookupService';
 
+type ErrorWithCode = Error & { code?: string };
+
+const isErrorWithCode = (error: unknown): error is ErrorWithCode =>
+  error instanceof Error && typeof (error as { code?: unknown }).code === 'string';
+
 const router = Router();
 
 const authLimiter = rateLimit({
@@ -38,9 +43,15 @@ router.post('/signup', async (req, res) => {
 
     // Basic required field check
     if (!email || !password || !role) {
-      return res.status(422).json(
-        createErrorResponse('email, password, and role are required', undefined, 'MISSING_REQUIRED_FIELDS')
-      );
+      return res
+        .status(422)
+        .json(
+          createErrorResponse(
+            'email, password, and role are required',
+            undefined,
+            'MISSING_REQUIRED_FIELDS'
+          )
+        );
     }
 
     const response = await signUp({ email, password, role, tenantId, tenantName, profile });
@@ -48,38 +59,40 @@ router.post('/signup', async (req, res) => {
   } catch (error) {
     // Handle ValidationError (422 Unprocessable Entity)
     if (error instanceof ValidationError) {
-      return res.status(422).json(
-        createErrorResponse(error.message, error.field, error.code)
-      );
+      return res.status(422).json(createErrorResponse(error.message, error.field, error.code));
     }
 
     // Handle duplicate email (409 Conflict)
-    if (error instanceof Error && (error as any).code === 'DUPLICATE_EMAIL') {
-      return res.status(409).json(
-        createErrorResponse(error.message, 'email', 'DUPLICATE_EMAIL')
-      );
+    if (isErrorWithCode(error) && error.code === 'DUPLICATE_EMAIL') {
+      return res.status(409).json(createErrorResponse(error.message, 'email', 'DUPLICATE_EMAIL'));
     }
 
     // Handle known errors with appropriate status codes
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
       if (message.includes('tenant not found')) {
-        return res.status(404).json(
-          createErrorResponse(error.message, 'tenantId', 'TENANT_NOT_FOUND')
-        );
+        return res
+          .status(404)
+          .json(createErrorResponse(error.message, 'tenantId', 'TENANT_NOT_FOUND'));
       }
       if (message.includes('validation') || message.includes('invalid')) {
-        return res.status(422).json(
-          createErrorResponse(error.message, undefined, 'VALIDATION_ERROR')
-        );
+        return res
+          .status(422)
+          .json(createErrorResponse(error.message, undefined, 'VALIDATION_ERROR'));
       }
     }
 
     // Unknown errors (500 Internal Server Error)
     console.error('[auth] Signup error:', error);
-    return res.status(500).json(
-      createErrorResponse('An unexpected error occurred during registration', undefined, 'INTERNAL_ERROR')
-    );
+    return res
+      .status(500)
+      .json(
+        createErrorResponse(
+          'An unexpected error occurred during registration',
+          undefined,
+          'INTERNAL_ERROR'
+        )
+      );
   }
 });
 
@@ -88,9 +101,15 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(422).json(
-        createErrorResponse('email and password are required', undefined, 'MISSING_REQUIRED_FIELDS')
-      );
+      return res
+        .status(422)
+        .json(
+          createErrorResponse(
+            'email and password are required',
+            undefined,
+            'MISSING_REQUIRED_FIELDS'
+          )
+        );
     }
 
     const response = await login(
@@ -106,20 +125,26 @@ router.post('/login', async (req, res) => {
       stack: errorObj.stack,
       name: errorObj.name
     });
-    
+
     const errorMessage = errorObj.message;
-    
+
     // Return 401 for authentication errors
     if (errorMessage.includes('Invalid credentials') || errorMessage.includes('not found')) {
-      return res.status(401).json(
-        createErrorResponse('Invalid credentials', 'password', 'INVALID_CREDENTIALS')
-      );
+      return res
+        .status(401)
+        .json(createErrorResponse('Invalid credentials', 'password', 'INVALID_CREDENTIALS'));
     }
-    
+
     // Return 500 for unexpected errors
-    return res.status(500).json(
-      createErrorResponse('An unexpected error occurred during login', undefined, 'INTERNAL_ERROR')
-    );
+    return res
+      .status(500)
+      .json(
+        createErrorResponse(
+          'An unexpected error occurred during login',
+          undefined,
+          'INTERNAL_ERROR'
+        )
+      );
   }
 });
 

@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { PoolClient } from 'pg';
 import { getPool } from '../db/connection';
 import { createUser } from './userService';
 import { createStudent } from './studentService';
@@ -70,11 +70,7 @@ export async function registerUser(
   input: UserRegistrationInput,
   options: UserRegistrationOptions = {}
 ): Promise<UserRegistrationResult> {
-  const {
-    immediateActivation = false,
-    createProfileImmediately = false,
-    actorId
-  } = options;
+  const { immediateActivation = false, createProfileImmediately = false, actorId } = options;
 
   const pool = getPool();
 
@@ -146,4 +142,3 @@ export async function registerUser(
     isVerified: isVerified
   };
 }
-

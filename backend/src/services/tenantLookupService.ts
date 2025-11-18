@@ -1,4 +1,3 @@
-import { Pool } from 'pg';
 import { getPool } from '../db/connection';
 
 export interface TenantLookupResult {
@@ -121,7 +120,7 @@ export async function findTenantByDomain(domain: string): Promise<TenantLookupRe
 /**
  * List all active tenants (for dropdown/autocomplete)
  * Returns a paginated list of schools available for registration
- * 
+ *
  * @param limit - Maximum number of results (default: 50)
  * @param offset - Number of results to skip (default: 0)
  * @param includeInactive - Whether to include inactive tenants (default: false)
@@ -132,9 +131,9 @@ export async function listActiveTenants(
   includeInactive: boolean = false
 ): Promise<{ tenants: TenantLookupResult[]; total: number }> {
   const pool = getPool();
-  
+
   const statusFilter = includeInactive ? '' : "AND t.status = 'active'";
-  
+
   // Get total count
   const countResult = await pool.query(
     `
@@ -181,7 +180,7 @@ export async function listActiveTenants(
  */
 export async function getRecentSchools(limit: number = 20): Promise<TenantLookupResult[]> {
   const pool = getPool();
-  
+
   const result = await pool.query(
     `
       SELECT DISTINCT
@@ -232,4 +231,3 @@ export async function lookupTenant(
 
   return null;
 }
-

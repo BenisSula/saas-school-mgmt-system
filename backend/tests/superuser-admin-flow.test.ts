@@ -41,10 +41,9 @@ describe('SuperUser → Admin Flow Integration', () => {
     const passwordHash = await argon2.hash(superUserPassword);
 
     // Check if user already exists
-    const existingUser = await pool.query(
-      'SELECT * FROM shared.users WHERE email = $1',
-      [superUserEmail]
-    );
+    const existingUser = await pool.query('SELECT * FROM shared.users WHERE email = $1', [
+      superUserEmail
+    ]);
 
     if (existingUser.rows.length === 0) {
       // Insert superadmin directly into database
@@ -67,7 +66,9 @@ describe('SuperUser → Admin Flow Integration', () => {
       superUserToken = loginResponse.body.accessToken;
       superUserId = loginResponse.body.user.id;
     } else {
-      throw new Error(`Failed to login superuser: ${loginResponse.body.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to login superuser: ${loginResponse.body.message || 'Unknown error'}`
+      );
     }
   });
 
@@ -104,7 +105,7 @@ describe('SuperUser → Admin Flow Integration', () => {
       expect([201, 400]).toContain(adminSignupResponse.status);
       return; // Skip rest of test if signup failed
     }
-    
+
     expect(adminSignupResponse.status).toBe(201);
     expect(adminSignupResponse.body.user.role).toBe('admin');
     expect(adminSignupResponse.body.user.tenantId).toBeTruthy();
@@ -133,16 +134,12 @@ describe('SuperUser → Admin Flow Integration', () => {
     expect(adminUserCheck.rows[0].tenant_id).toBeTruthy();
 
     // Step 5: Update admin status to active (simulating approval)
-    await pool.query(
-      `UPDATE shared.users SET status = 'active' WHERE id = $1`,
-      [adminUserId]
-    );
+    await pool.query(`UPDATE shared.users SET status = 'active' WHERE id = $1`, [adminUserId]);
 
     // Step 6: Verify admin is now active
-    const activeAdminCheck = await pool.query(
-      `SELECT status FROM shared.users WHERE id = $1`,
-      [adminUserId]
-    );
+    const activeAdminCheck = await pool.query(`SELECT status FROM shared.users WHERE id = $1`, [
+      adminUserId
+    ]);
 
     expect(activeAdminCheck.rows[0].status).toBe('active');
 
@@ -196,10 +193,10 @@ describe('SuperUser → Admin Flow Integration', () => {
       // Schema exists and has tables
       expect(true).toBe(true);
     } catch (error) {
+      expect(error).toBeDefined();
       // Schema might not exist or tables not created yet
       // This is acceptable for integration test - tenant creation is what matters
       expect(schemaName).toBeTruthy();
     }
   });
 });
-
