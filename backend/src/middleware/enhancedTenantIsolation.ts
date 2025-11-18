@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { PoolClient } from 'pg';
 import { logger } from '../lib/logger';
 
 /**

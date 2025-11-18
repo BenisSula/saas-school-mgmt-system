@@ -12,7 +12,7 @@ function listenWithRetry(server: http.Server, startPort: number, attempts = 5): 
   let currentPort = startPort;
   let remaining = Math.max(1, attempts);
   const tryListen = () => {
-    server.once('error', (err: NodeJS.ErrnoException) => {
+    server.once('error', (err: Error & { code?: string }) => {
       if (err.code === 'EADDRINUSE' && remaining > 1) {
         remaining -= 1;
         currentPort += 1;

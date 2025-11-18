@@ -606,6 +606,8 @@ export async function getTenantAnalytics(tenantId: string) {
   });
 }
 
+// Function overloads for getUsageMonitoring
+/* eslint-disable no-redeclare */
 export async function getUsageMonitoring(tenantId: string): Promise<{
   tenantId: string;
   activeUsers: number;

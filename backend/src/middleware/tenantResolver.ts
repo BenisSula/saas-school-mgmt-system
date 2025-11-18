@@ -1,9 +1,10 @@
+import { Request, Response, NextFunction } from 'express';
+import type { PoolClient } from 'pg';
+import { getPool } from '../db/connection';
+
 function isValidSchemaName(schemaName: string): boolean {
   return /^[a-zA-Z0-9_]+$/.test(schemaName);
 }
-import { Request, Response, NextFunction } from 'express';
-import { PoolClient } from 'pg';
-import { getPool } from '../db/connection';
 
 interface TenantRecord {
   id: string;

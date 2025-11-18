@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { StudentInput } from '../validators/studentValidator';
-import { getTableName, parseJsonField, serializeJsonField } from '../lib/serviceUtils';
+import { getTableName, serializeJsonField } from '../lib/serviceUtils';
 
 const table = 'students';
 
