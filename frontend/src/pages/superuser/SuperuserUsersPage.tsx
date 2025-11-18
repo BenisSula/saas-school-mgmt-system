@@ -154,9 +154,7 @@ export function SuperuserUsersPage() {
             {row.fullName || row.email}
           </p>
           <p className="text-xs text-[var(--brand-muted)]">{row.email}</p>
-          {row.username && (
-            <p className="text-xs text-[var(--brand-muted)]">@{row.username}</p>
-          )}
+          {row.username && <p className="text-xs text-[var(--brand-muted)]">@{row.username}</p>}
         </div>
       )
     },
@@ -184,7 +182,7 @@ export function SuperuserUsersPage() {
     {
       header: 'Status',
       render: (row) => {
-        const status = row.isVerified ? (row.status || 'active') : 'pending';
+        const status = row.isVerified ? row.status || 'active' : 'pending';
         const statusColors = {
           active: 'bg-emerald-500/20 text-emerald-200',
           pending: 'bg-amber-500/20 text-amber-200',
@@ -223,11 +221,7 @@ export function SuperuserUsersPage() {
               Suspend
             </Button>
           ) : row.status === 'suspended' ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleStatusUpdate(row.id, 'active')}
-            >
+            <Button size="sm" variant="ghost" onClick={() => handleStatusUpdate(row.id, 'active')}>
               Activate
             </Button>
           ) : null}
@@ -253,8 +247,8 @@ export function SuperuserUsersPage() {
               Platform user management
             </h1>
             <p className="text-sm text-[var(--brand-muted)]">
-              Audit all platform users, enforce password resets, and monitor pending approvals across
-              tenant environments.
+              Audit all platform users, enforce password resets, and monitor pending approvals
+              across tenant environments.
             </p>
           </div>
         </header>
@@ -301,11 +295,7 @@ export function SuperuserUsersPage() {
               filters.role !== 'all' ||
               filters.status !== 'all' ||
               filters.search) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setFilters(defaultFilters)}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setFilters(defaultFilters)}>
                 Clear filters
               </Button>
             )}

@@ -26,16 +26,9 @@ export function ProfileSection({
             {title}
           </h3>
         )}
-        {description && (
-          <p className="mb-4 text-sm text-[var(--brand-muted)]">{description}</p>
-        )}
-        {isEmpty ? (
-          <p className="text-sm text-[var(--brand-muted)]">{emptyMessage}</p>
-        ) : (
-          children
-        )}
+        {description && <p className="mb-4 text-sm text-[var(--brand-muted)]">{description}</p>}
+        {isEmpty ? <p className="text-sm text-[var(--brand-muted)]">{emptyMessage}</p> : children}
       </Card>
     </motion.div>
   );
 }
-

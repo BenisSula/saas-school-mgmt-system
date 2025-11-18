@@ -137,8 +137,7 @@ export function AdminInvoicePage() {
       {
         header: 'Due Date',
         key: 'due_date' as const,
-        render: (row: Invoice) =>
-          row.due_date ? formatDate(row.due_date) : 'N/A'
+        render: (row: Invoice) => (row.due_date ? formatDate(row.due_date) : 'N/A')
       }
     ],
     []

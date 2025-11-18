@@ -24,7 +24,7 @@ export function useProfileData<T>(options: UseProfileDataOptions) {
   // Refresh profile data when user state changes (after login/registration)
   const refreshProfile = useCallback(async () => {
     if (!enabled) return;
-    
+
     let cancelled = false;
     try {
       const profileData = await profileLoader();
@@ -132,4 +132,3 @@ export function useProfileData<T>(options: UseProfileDataOptions) {
     setUploads
   };
 }
-

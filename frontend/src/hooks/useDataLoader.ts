@@ -7,10 +7,7 @@ interface UseDataLoaderOptions {
   successMessage?: string;
 }
 
-export function useDataLoader<T>(
-  loadFn: () => Promise<T>,
-  options: UseDataLoaderOptions = {}
-) {
+export function useDataLoader<T>(loadFn: () => Promise<T>, options: UseDataLoaderOptions = {}) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,4 +35,3 @@ export function useDataLoader<T>(
 
   return { data, loading, error, loadData, setData, setError };
 }
-

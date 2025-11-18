@@ -92,10 +92,7 @@ export function PieChart({
           <div className="space-y-2">
             {segments.map((segment, index) => (
               <div key={index} className="flex items-center gap-2">
-                <div
-                  className="h-3 w-3 rounded-full"
-                  style={{ backgroundColor: segment.color }}
-                />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: segment.color }} />
                 <span className="text-xs text-[var(--brand-surface-contrast)]">
                   {segment.label}: {segment.value} ({segment.percentage.toFixed(1)}%)
                 </span>
@@ -107,4 +104,3 @@ export function PieChart({
     </motion.div>
   );
 }
-

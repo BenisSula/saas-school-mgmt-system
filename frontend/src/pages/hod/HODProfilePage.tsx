@@ -280,9 +280,7 @@ export default function HODProfilePage() {
   return (
     <ProfileLayout
       title={profile?.name || 'Profile'}
-      subtitle={
-        profile?.department ? `Head of ${profile.department}` : profile?.email || undefined
-      }
+      subtitle={profile?.department ? `Head of ${profile.department}` : profile?.email || undefined}
       loading={loading}
       error={error}
       sections={sections}

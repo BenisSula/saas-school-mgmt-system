@@ -52,8 +52,7 @@ export default function SuperuserTenantAnalyticsPage() {
   const growthTrend: LineChartDataPoint[] = useMemo(() => {
     // Sort by creation date and show growth
     const sorted = [...schools].sort(
-      (a, b) =>
-        new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime()
+      (a, b) => new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime()
     );
     let cumulative = 0;
     return sorted.map((school) => {
@@ -204,11 +203,7 @@ export default function SuperuserTenantAnalyticsPage() {
             />
           </div>
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm lg:col-span-2">
-            <LineChart
-              data={growthTrend}
-              title="Platform Growth Trend"
-              height={200}
-            />
+            <LineChart data={growthTrend} title="Platform Growth Trend" height={200} />
           </div>
         </div>
 
@@ -226,4 +221,3 @@ export default function SuperuserTenantAnalyticsPage() {
     </RouteMeta>
   );
 }
-

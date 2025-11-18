@@ -76,7 +76,11 @@ export default function SuperuserOverviewPage() {
       { label: 'Admins', value: overview.roleDistribution.admins, color: 'var(--brand-primary)' },
       { label: 'HODs', value: overview.roleDistribution.hods, color: 'var(--brand-accent)' },
       { label: 'Teachers', value: overview.roleDistribution.teachers, color: 'var(--brand-info)' },
-      { label: 'Students', value: overview.roleDistribution.students, color: 'var(--brand-success)' }
+      {
+        label: 'Students',
+        value: overview.roleDistribution.students,
+        color: 'var(--brand-success)'
+      }
     ].filter((item) => item.value > 0);
   }, [overview]);
 
@@ -236,10 +240,7 @@ export default function SuperuserOverviewPage() {
         </section>
 
         {/* Role Distribution and Health Metrics */}
-        <section
-          className="grid gap-6 lg:grid-cols-2"
-          aria-label="Platform activity and growth"
-        >
+        <section className="grid gap-6 lg:grid-cols-2" aria-label="Platform activity and growth">
           {roleDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">

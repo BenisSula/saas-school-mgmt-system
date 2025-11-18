@@ -56,7 +56,9 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter((row) =>
-        Object.values(row as Record<string, unknown>).some((val) => String(val).toLowerCase().includes(term))
+        Object.values(row as Record<string, unknown>).some((val) =>
+          String(val).toLowerCase().includes(term)
+        )
       );
     }
 
@@ -140,9 +142,7 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
                   <div className="flex items-center gap-2">
                     {column.header}
                     {column.sortable && sortColumn === column.key && (
-                      <span className="text-xs">
-                        {sortDirection === 'asc' ? '↑' : '↓'}
-                      </span>
+                      <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </div>
                 </th>
@@ -152,7 +152,10 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
           <tbody>
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="text-center py-8 text-sm text-[var(--brand-muted)]">
+                <td
+                  colSpan={columns.length}
+                  className="text-center py-8 text-sm text-[var(--brand-muted)]"
+                >
                   {emptyMessage}
                 </td>
               </tr>
@@ -223,4 +226,3 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
     </motion.div>
   );
 }
-

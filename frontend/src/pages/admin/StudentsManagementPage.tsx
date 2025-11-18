@@ -11,7 +11,12 @@ import { DashboardSkeleton } from '../../components/ui/DashboardSkeleton';
 import { PaginatedTable } from '../../components/admin/PaginatedTable';
 import { ExportButtons } from '../../components/admin/ExportButtons';
 import { exportToCSV } from '../../lib/utils/export';
-import { api, type StudentRecord, type SchoolClass, type StudentProfileDetail } from '../../lib/api';
+import {
+  api,
+  type StudentRecord,
+  type SchoolClass,
+  type StudentProfileDetail
+} from '../../lib/api';
 import type { TableColumn } from '../../components/ui/Table';
 import { defaultDate } from '../../lib/utils/date';
 
@@ -31,7 +36,9 @@ export function StudentsManagementPage() {
   const navigate = useNavigate();
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [studentDetails, setStudentDetails] = useState<Map<string, StudentProfileDetail>>(new Map());
+  const [studentDetails, setStudentDetails] = useState<Map<string, StudentProfileDetail>>(
+    new Map()
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<StudentFilters>(defaultFilters);
@@ -193,7 +200,11 @@ export function StudentsManagementPage() {
     } else {
       // Check if student has parent_contacts in the raw data
       const rawStudent = students.find((s) => s.id === student.id);
-      if (rawStudent && Array.isArray(rawStudent.parent_contacts) && rawStudent.parent_contacts.length > 0) {
+      if (
+        rawStudent &&
+        Array.isArray(rawStudent.parent_contacts) &&
+        rawStudent.parent_contacts.length > 0
+      ) {
         const firstParent = rawStudent.parent_contacts[0];
         setParentName(firstParent.name || '');
         setParentContact(firstParent.phone || firstParent.relationship || '');
@@ -259,7 +270,7 @@ export function StudentsManagementPage() {
       'First Name': s.first_name,
       'Last Name': s.last_name,
       'Admission Number': s.admission_number || 'N/A',
-      'Class': s.class_id || 'N/A'
+      Class: s.class_id || 'N/A'
     }));
     exportToCSV(exportData, `students-${defaultDate()}`);
   };
@@ -434,7 +445,9 @@ export function StudentsManagementPage() {
             <span>
               Showing {filteredStudents.length} of {students.length} students
             </span>
-            {(filters.search || filters.classId !== 'all' || filters.enrollmentStatus !== 'all') && (
+            {(filters.search ||
+              filters.classId !== 'all' ||
+              filters.enrollmentStatus !== 'all') && (
               <Button size="sm" variant="ghost" onClick={() => setFilters(defaultFilters)}>
                 Clear filters
               </Button>
@@ -506,14 +519,16 @@ export function StudentsManagementPage() {
                       <div className="text-sm text-[var(--brand-surface-contrast)]">
                         {Array.isArray(selectedStudentDetail.parentContacts) &&
                         selectedStudentDetail.parentContacts.length > 0 ? (
-                          selectedStudentDetail.parentContacts.map((parent: unknown, idx: number) => {
-                            const p = parent as { name?: string; contact?: string };
-                            return (
-                              <div key={idx}>
-                                {p.name} - {p.contact}
-                              </div>
-                            );
-                          })
+                          selectedStudentDetail.parentContacts.map(
+                            (parent: unknown, idx: number) => {
+                              const p = parent as { name?: string; contact?: string };
+                              return (
+                                <div key={idx}>
+                                  {p.name} - {p.contact}
+                                </div>
+                              );
+                            }
+                          )
                         ) : (
                           <span className="text-[var(--brand-muted)]">No parent information</span>
                         )}
@@ -604,4 +619,3 @@ export function StudentsManagementPage() {
 }
 
 export default StudentsManagementPage;
-

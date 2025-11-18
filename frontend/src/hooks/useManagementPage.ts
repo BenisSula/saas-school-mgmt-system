@@ -77,7 +77,11 @@ export function useManagementPage<T extends BaseFilters, TData, TRecord extends 
 
   // Use filters hook - cast filterFn to match useFilters signature
   const { filters, filteredData, updateFilter, resetFilters, hasActiveFilters, setFilters } =
-    useFilters(defaultFilters, filterFn as (item: unknown, filters: T) => boolean, records as unknown[]);
+    useFilters(
+      defaultFilters,
+      filterFn as (item: unknown, filters: T) => boolean,
+      records as unknown[]
+    );
 
   // Use bulk operations hook
   const bulkOps = useBulkOperations({
@@ -110,4 +114,3 @@ export function useManagementPage<T extends BaseFilters, TData, TRecord extends 
     ...bulkOps
   };
 }
-

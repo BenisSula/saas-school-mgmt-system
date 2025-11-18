@@ -1,4 +1,3 @@
-
 export interface ActivityItem {
   id: string;
   action: string;
@@ -52,4 +51,3 @@ export function ActivityHistory({
     </div>
   );
 }
-

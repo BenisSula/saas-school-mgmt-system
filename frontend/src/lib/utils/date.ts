@@ -58,4 +58,3 @@ export function deriveDateRange(value: '7' | '30' | '90' | 'all'): { from: strin
 export function defaultDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
-

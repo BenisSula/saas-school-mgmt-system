@@ -119,11 +119,7 @@ export function FileUploads({
                   </Button>
                 )}
                 {canDelete && onDelete && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onDelete(upload.id)}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => onDelete(upload.id)}>
                     Delete
                   </Button>
                 )}
@@ -135,4 +131,3 @@ export function FileUploads({
     </div>
   );
 }
-

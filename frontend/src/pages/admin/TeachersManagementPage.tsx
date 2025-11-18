@@ -427,7 +427,9 @@ export function TeachersManagementPage() {
                         </span>
                       ))
                     ) : (
-                      <span className="text-xs text-[var(--brand-muted)]">No subjects assigned</span>
+                      <span className="text-xs text-[var(--brand-muted)]">
+                        No subjects assigned
+                      </span>
                     )}
                   </div>
                 </div>
@@ -453,7 +455,11 @@ export function TeachersManagementPage() {
                 <Button variant="ghost" onClick={() => setShowProfileModal(false)}>
                   Close
                 </Button>
-                <Button onClick={() => navigate(`/dashboard/teacher/profile?teacherId=${selectedTeacher.id}`)}>
+                <Button
+                  onClick={() =>
+                    navigate(`/dashboard/teacher/profile?teacherId=${selectedTeacher.id}`)
+                  }
+                >
                   View full profile
                 </Button>
               </div>
@@ -499,7 +505,10 @@ export function TeachersManagementPage() {
                   onChange={(e) => setIsClassTeacher(e.target.checked)}
                   className="rounded border-[var(--brand-border)]"
                 />
-                <label htmlFor="isClassTeacher" className="text-sm text-[var(--brand-surface-contrast)]">
+                <label
+                  htmlFor="isClassTeacher"
+                  className="text-sm text-[var(--brand-surface-contrast)]"
+                >
                   Assign as class teacher
                 </label>
               </div>
@@ -518,4 +527,3 @@ export function TeachersManagementPage() {
 }
 
 export default TeachersManagementPage;
-

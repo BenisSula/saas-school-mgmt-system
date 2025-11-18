@@ -255,11 +255,7 @@ function SummaryCard({ title, value, description }: SummaryCardProps) {
 function exportHistory(history: AttendanceHistoryItem[]) {
   const rows = [['Date', 'Class', 'Status']];
   history.forEach((item) => {
-    rows.push([
-      formatDateShort(item.attendance_date),
-      item.class_id ?? '',
-      item.status
-    ]);
+    rows.push([formatDateShort(item.attendance_date), item.class_id ?? '', item.status]);
   });
 
   const csv = rows

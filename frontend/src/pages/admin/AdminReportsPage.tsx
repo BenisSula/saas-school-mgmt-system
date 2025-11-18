@@ -26,18 +26,21 @@ export default function AdminReportsPage() {
 
   const attendanceChartData: BarChartData[] = useMemo(() => {
     // Group by class_id and status
-    const grouped = attendance.reduce((acc, item) => {
-      const key = item.class_id || 'unknown';
-      if (!acc[key]) {
-        acc[key] = { present: 0, absent: 0 };
-      }
-      if (item.status === 'present') {
-        acc[key].present += item.count;
-      } else {
-        acc[key].absent += item.count;
-      }
-      return acc;
-    }, {} as Record<string, { present: number; absent: number }>);
+    const grouped = attendance.reduce(
+      (acc, item) => {
+        const key = item.class_id || 'unknown';
+        if (!acc[key]) {
+          acc[key] = { present: 0, absent: 0 };
+        }
+        if (item.status === 'present') {
+          acc[key].present += item.count;
+        } else {
+          acc[key].absent += item.count;
+        }
+        return acc;
+      },
+      {} as Record<string, { present: number; absent: number }>
+    );
 
     return Object.entries(grouped).map(([classId, data]) => ({
       label: classId === 'unknown' ? 'Unknown' : classId,
@@ -146,16 +149,12 @@ export default function AdminReportsPage() {
             <DatePicker
               label="From Date"
               value={attendanceFilters.from}
-              onChange={(e) =>
-                setAttendanceFilters({ ...attendanceFilters, from: e.target.value })
-              }
+              onChange={(e) => setAttendanceFilters({ ...attendanceFilters, from: e.target.value })}
             />
             <DatePicker
               label="To Date"
               value={attendanceFilters.to}
-              onChange={(e) =>
-                setAttendanceFilters({ ...attendanceFilters, to: e.target.value })
-              }
+              onChange={(e) => setAttendanceFilters({ ...attendanceFilters, to: e.target.value })}
             />
             <Select
               label="Class"
@@ -174,11 +173,7 @@ export default function AdminReportsPage() {
         {/* Attendance Chart */}
         {attendanceChartData.length > 0 && (
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <BarChart
-              data={attendanceChartData}
-              title="Attendance by Class"
-              height={250}
-            />
+            <BarChart data={attendanceChartData} title="Attendance by Class" height={250} />
           </div>
         )}
 
@@ -196,4 +191,3 @@ export default function AdminReportsPage() {
     </RouteMeta>
   );
 }
-

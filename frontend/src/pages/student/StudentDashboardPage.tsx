@@ -70,7 +70,8 @@ export default function StudentDashboardPage() {
     return result.breakdown.map((subject) => ({
       label: subject.subject,
       value: subject.score,
-      color: subject.score >= 70 ? 'var(--brand-primary)' : subject.score >= 50 ? '#f59e0b' : '#ef4444'
+      color:
+        subject.score >= 70 ? 'var(--brand-primary)' : subject.score >= 50 ? '#f59e0b' : '#ef4444'
     }));
   }, [result]);
 
@@ -253,7 +254,13 @@ export default function StudentDashboardPage() {
               label: `${attendanceSummary.present} of ${attendanceSummary.total} sessions`
             }}
             icon={<Calendar className="h-5 w-5" />}
-            trend={attendanceSummary.percentage >= 80 ? 'up' : attendanceSummary.percentage >= 60 ? 'neutral' : 'down'}
+            trend={
+              attendanceSummary.percentage >= 80
+                ? 'up'
+                : attendanceSummary.percentage >= 60
+                  ? 'neutral'
+                  : 'down'
+            }
           />
           <StatCard
             title="Outstanding fees"
@@ -276,9 +283,7 @@ export default function StudentDashboardPage() {
           <StatCard
             title="Latest grade"
             value={
-              result
-                ? `${result.grade} (${result.overall_score.toFixed(1)})`
-                : 'Check results'
+              result ? `${result.grade} (${result.overall_score.toFixed(1)})` : 'Check results'
             }
             description={
               result && gradePercentage !== null
@@ -302,20 +307,12 @@ export default function StudentDashboardPage() {
           )}
           {subjectPerformance.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <BarChart
-                data={subjectPerformance}
-                title="Subject Performance"
-                height={200}
-              />
+              <BarChart data={subjectPerformance} title="Subject Performance" height={200} />
             </div>
           )}
           {feeBreakdown.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm lg:col-span-2">
-              <BarChart
-                data={feeBreakdown}
-                title="Fee Status Breakdown"
-                height={200}
-              />
+              <BarChart data={feeBreakdown} title="Fee Status Breakdown" height={200} />
             </div>
           )}
         </div>

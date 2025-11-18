@@ -53,10 +53,7 @@ export function useSubscriptions() {
 
 // Usage Monitoring
 export function useUsage(tenantId?: string) {
-  return useQuery(
-    queryKeys.superuser.usage(tenantId),
-    () => api.superuser.getUsage(tenantId),
-    { enabled: true }
-  );
+  return useQuery(queryKeys.superuser.usage(tenantId), () => api.superuser.getUsage(tenantId), {
+    enabled: true
+  });
 }
-

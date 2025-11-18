@@ -66,11 +66,7 @@ export default function AdminExamConfigPage() {
             <Button size="sm" variant="outline">
               Edit
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => deleteExamMutation.mutate(row.id)}
-            >
+            <Button size="sm" variant="ghost" onClick={() => deleteExamMutation.mutate(row.id)}>
               Delete
             </Button>
           </div>
@@ -191,4 +187,3 @@ export default function AdminExamConfigPage() {
     </RouteMeta>
   );
 }
-

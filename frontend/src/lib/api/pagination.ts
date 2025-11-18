@@ -40,4 +40,3 @@ export function isPaginatedResponse<T>(response: unknown): response is Paginated
     Array.isArray((response as PaginatedResponse<T>).data)
   );
 }
-

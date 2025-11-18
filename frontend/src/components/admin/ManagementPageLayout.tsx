@@ -41,7 +41,9 @@ export function ManagementPageLayout({
           animate="visible"
         >
           <div>
-            <h1 className="text-xl font-semibold text-[var(--brand-text-primary)] sm:text-2xl">{title}</h1>
+            <h1 className="text-xl font-semibold text-[var(--brand-text-primary)] sm:text-2xl">
+              {title}
+            </h1>
             <p className="mt-1 text-sm text-[var(--brand-muted)]">{description}</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -67,4 +69,3 @@ export function ManagementPageLayout({
     </RouteMeta>
   );
 }
-

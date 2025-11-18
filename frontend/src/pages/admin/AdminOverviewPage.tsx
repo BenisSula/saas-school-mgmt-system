@@ -266,20 +266,12 @@ export default function AdminOverviewPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           {roleDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <PieChart
-                data={roleDistribution}
-                title="Role Distribution"
-                size={250}
-              />
+              <PieChart data={roleDistribution} title="Role Distribution" size={250} />
             </div>
           )}
           {statusDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <BarChart
-                data={statusDistribution}
-                title="User Status Distribution"
-                height={250}
-              />
+              <BarChart data={statusDistribution} title="User Status Distribution" height={250} />
             </div>
           )}
         </div>

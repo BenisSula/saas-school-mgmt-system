@@ -10,7 +10,10 @@ function useQueryParam(name: string): string | null {
 export default function AuthUnifiedPage() {
   const navigate = useNavigate();
   const modeParam = useQueryParam('mode');
-  const mode: AuthView = useMemo(() => (modeParam === 'register' ? 'register' : 'login'), [modeParam]);
+  const mode: AuthView = useMemo(
+    () => (modeParam === 'register' ? 'register' : 'login'),
+    [modeParam]
+  );
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-10">
@@ -23,5 +26,3 @@ export default function AuthUnifiedPage() {
     </div>
   );
 }
-
-

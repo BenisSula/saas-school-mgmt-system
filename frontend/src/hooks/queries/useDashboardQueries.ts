@@ -112,8 +112,10 @@ export function useHODDashboard() {
       const users = await api.listUsers();
       const currentUser = users.find((u) => u.id === user?.id);
       const hodRole = currentUser?.additional_roles?.find((r) => r.role === 'hod');
-      const department = (hodRole?.metadata as { department?: string })?.department || 
-                        teacherProfile.subjects[0] || 'General';
+      const department =
+        (hodRole?.metadata as { department?: string })?.department ||
+        teacherProfile.subjects[0] ||
+        'General';
 
       // Get teachers in same department
       const teachers = await api.listTeachers();
@@ -124,7 +126,7 @@ export function useHODDashboard() {
       // Get students in classes taught by department teachers
       const students = await api.listStudents();
       const classes = await api.listClasses();
-      
+
       return {
         department,
         teachers: departmentTeachers,
@@ -142,4 +144,3 @@ export function useHODDashboard() {
     error: departmentQuery.error
   };
 }
-

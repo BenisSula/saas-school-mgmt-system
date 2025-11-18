@@ -174,18 +174,10 @@ export default function SuperuserSubscriptionsPage() {
         {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <BarChart
-              data={subscriptionBreakdown}
-              title="Subscription Distribution"
-              height={250}
-            />
+            <BarChart data={subscriptionBreakdown} title="Subscription Distribution" height={250} />
           </div>
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <PieChart
-              data={revenueData}
-              title="Revenue by Tier"
-              size={250}
-            />
+            <PieChart data={revenueData} title="Revenue by Tier" size={250} />
           </div>
         </div>
 

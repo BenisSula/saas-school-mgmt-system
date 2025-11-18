@@ -186,29 +186,17 @@ export default function TeacherDashboardPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           {classDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <BarChart
-                data={classDistribution}
-                title="Assignments by Class"
-                height={250}
-              />
+              <BarChart data={classDistribution} title="Assignments by Class" height={250} />
             </div>
           )}
           {subjectDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <PieChart
-                data={subjectDistribution}
-                title="Subject Distribution"
-                size={250}
-              />
+              <PieChart data={subjectDistribution} title="Subject Distribution" size={250} />
             </div>
           )}
           {roleDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm lg:col-span-2">
-              <PieChart
-                data={roleDistribution}
-                title="Role Distribution"
-                size={200}
-              />
+              <PieChart data={roleDistribution} title="Role Distribution" size={200} />
             </div>
           )}
         </div>

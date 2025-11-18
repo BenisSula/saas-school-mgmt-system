@@ -8,7 +8,11 @@ import { AvatarDropdown } from '../ui/AvatarDropdown';
 import { SearchBar } from '../ui/SearchBar';
 import { Notifications } from '../ui/Notifications';
 import { useDashboardRouteMeta } from '../../context/DashboardRouteContext';
-import { useNotifications, useMarkNotificationAsRead, useMarkAllNotificationsAsRead } from '../../hooks/queries/useNotifications';
+import {
+  useNotifications,
+  useMarkNotificationAsRead,
+  useMarkAllNotificationsAsRead
+} from '../../hooks/queries/useNotifications';
 
 export interface DashboardHeaderProps {
   onToggleSidebar: () => void;
@@ -29,7 +33,7 @@ export function DashboardHeader({
     ? ({ 'aria-expanded': 'true' as const } satisfies AriaAttributes)
     : ({ 'aria-expanded': 'false' as const } satisfies AriaAttributes);
   const { title, titleId } = useDashboardRouteMeta();
-  
+
   const { data: notificationsData } = useNotifications(50);
   const notifications = notificationsData || [];
   const markAsRead = useMarkNotificationAsRead();

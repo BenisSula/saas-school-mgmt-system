@@ -28,4 +28,3 @@ export function formatCurrency(amount: number): string {
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat().format(value);
 }
-

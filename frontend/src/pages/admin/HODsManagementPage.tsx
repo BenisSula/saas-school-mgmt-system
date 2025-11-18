@@ -81,7 +81,10 @@ export function HODsManagementPage() {
 
   // Filter HODs: teachers with additional_roles containing 'hod'
   const hodUsers = useMemo(
-    () => users.filter((u) => u.role === 'teacher' && u.additional_roles?.some((r) => r.role === 'hod')),
+    () =>
+      users.filter(
+        (u) => u.role === 'teacher' && u.additional_roles?.some((r) => r.role === 'hod')
+      ),
     [users]
   );
 
@@ -94,15 +97,18 @@ export function HODsManagementPage() {
         // Count teachers under oversight (teachers with same subjects)
         const hodSubjects = teacher.subjects;
         const teachersUnderOversight = teachers.filter(
-          (t) =>
-            t.id !== teacher.id &&
-            t.subjects.some((subject) => hodSubjects.includes(subject))
+          (t) => t.id !== teacher.id && t.subjects.some((subject) => hodSubjects.includes(subject))
         ).length;
 
         // Extract department from metadata or use first subject as department
         const department =
-          (user.additional_roles?.find((r) => r.role === 'hod')?.metadata as { department?: string })
-            ?.department || teacher.subjects[0] || 'General';
+          (
+            user.additional_roles?.find((r) => r.role === 'hod')?.metadata as {
+              department?: string;
+            }
+          )?.department ||
+          teacher.subjects[0] ||
+          'General';
 
         return {
           ...teacher,
@@ -286,7 +292,9 @@ export function HODsManagementPage() {
             <span className="text-xs text-[var(--brand-muted)]">No subjects</span>
           )}
           {row.subjects.length > 3 && (
-            <span className="text-xs text-[var(--brand-muted)]">+{row.subjects.length - 3} more</span>
+            <span className="text-xs text-[var(--brand-muted)]">
+              +{row.subjects.length - 3} more
+            </span>
           )}
         </div>
       )
@@ -428,7 +436,9 @@ export function HODsManagementPage() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-[var(--brand-muted)] mb-1">Email</p>
-                  <p className="text-sm text-[var(--brand-surface-contrast)]">{selectedHOD.email}</p>
+                  <p className="text-sm text-[var(--brand-surface-contrast)]">
+                    {selectedHOD.email}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-[var(--brand-muted)] mb-1">Department</p>
@@ -466,7 +476,9 @@ export function HODsManagementPage() {
                 <Button variant="ghost" onClick={() => setShowProfileModal(false)}>
                   Close
                 </Button>
-                <Button onClick={() => navigate(`/dashboard/teacher/profile?teacherId=${selectedHOD.id}`)}>
+                <Button
+                  onClick={() => navigate(`/dashboard/teacher/profile?teacherId=${selectedHOD.id}`)}
+                >
                   View full profile
                 </Button>
               </div>
@@ -569,4 +581,3 @@ export function HODsManagementPage() {
 }
 
 export default HODsManagementPage;
-

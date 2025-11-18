@@ -57,4 +57,3 @@ export function useDepartmentAnalytics(departmentId?: string) {
     { enabled: true }
   );
 }
-

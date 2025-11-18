@@ -28,7 +28,7 @@ export async function fetchWithCsrf(
   options: RequestInit = {}
 ): Promise<Response> {
   const csrfHeaders = getCsrfHeader();
-  
+
   // eslint-disable-next-line no-undef
   const enhancedOptions: RequestInit = {
     ...options,
@@ -39,7 +39,6 @@ export async function fetchWithCsrf(
     },
     credentials: 'include' // Include cookies for CSRF token
   };
-  
+
   return fetch(url, enhancedOptions);
 }
-

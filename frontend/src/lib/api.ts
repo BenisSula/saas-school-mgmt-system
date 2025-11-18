@@ -60,8 +60,9 @@ function resolveApiBaseUrl(): string {
     return stripTrailingSlash(`${origin}/api`);
   }
 
-  const explicitRaw = (import.meta.env.VITE_API_BASE_URL ??
-    import.meta.env.VITE_API_URL) as string | undefined;
+  const explicitRaw = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL) as
+    | string
+    | undefined;
 
   if (!explicitRaw) {
     throw new Error('Missing or invalid VITE_API_BASE_URL: <empty> — see docs/.env.example');
@@ -141,8 +142,8 @@ function safeJoinUrl(path: string, base: string): string {
       const errorMsg = error instanceof Error ? error.message : String(error);
       throw new Error(
         `Failed to construct URL with base "${base}" and path "${path}": ${errorMsg}. ` +
-        `Please check VITE_API_BASE_URL or restart the dev server. ` +
-        `Current window.location.origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
+          `Please check VITE_API_BASE_URL or restart the dev server. ` +
+          `Current window.location.origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
       );
     }
   }
@@ -150,15 +151,15 @@ function safeJoinUrl(path: string, base: string): string {
   // Base is relative (e.g. '/api') – anchor to origin in the browser
   const origin = safeWindowOrigin();
   let absoluteBase: string;
-  
+
   if (!origin) {
     // Fallback to hardcoded dev server if window.location.origin is invalid (e.g., chrome-extension://)
     const fallbackOrigin = import.meta.env.DEV ? 'http://127.0.0.1:5173' : null;
     if (!fallbackOrigin) {
       throw new Error(
         `Cannot construct API URL: window.location.origin is not http(s) and no fallback available. ` +
-        `Please access the app via http://localhost:5173 (not via browser extension or file://). ` +
-        `Current origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
+          `Please access the app via http://localhost:5173 (not via browser extension or file://). ` +
+          `Current origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
       );
     }
     absoluteBase = `${fallbackOrigin}${base}`;
@@ -170,7 +171,7 @@ function safeJoinUrl(path: string, base: string): string {
   if (!isAbsoluteHttpUrl(absoluteBase)) {
     throw new Error(
       `Invalid absolute base URL constructed: "${absoluteBase}" (from origin: ${origin || 'null'}, base: ${base}). ` +
-      `This should never happen. Please report this error.`
+        `This should never happen. Please report this error.`
     );
   }
 
@@ -184,8 +185,8 @@ function safeJoinUrl(path: string, base: string): string {
     const errorMsg = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Failed to construct URL with path "${path}" and base "${absoluteBase}": ${errorMsg}. ` +
-      `Please check your environment configuration. ` +
-      `Current window.location.origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
+        `Please check your environment configuration. ` +
+        `Current window.location.origin: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}.`
     );
   }
 }
@@ -323,7 +324,7 @@ export function setAuthHandlers(handlers: {
 
 function persistSession(tokens: { refresh: string | null; tenant: string | null }) {
   if (typeof window === 'undefined') return;
-  
+
   // Use secure token storage for refresh token
   if (tokens.refresh) {
     if (isValidTokenFormat(tokens.refresh)) {
@@ -420,20 +421,20 @@ export function hydrateFromStorage(): { refreshToken: string | null; tenantId: s
   if (typeof window === 'undefined') {
     return { refreshToken: null, tenantId: null };
   }
-  
+
   // Get refresh token from secure storage
   const storedRefresh = getRefreshToken();
   refreshToken = storedRefresh;
-  
+
   // Get tenant ID from localStorage (non-sensitive)
   const storedTenant = getTenantId();
   const safeTenant = storedTenant && isValidTenantId(storedTenant) ? storedTenant : null;
   tenantId = safeTenant;
-  
+
   if (storedTenant && !isValidTenantId(storedTenant)) {
     storeTenantId(null);
   }
-  
+
   return { refreshToken: storedRefresh, tenantId: safeTenant };
 }
 
@@ -503,7 +504,10 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
   if (!isAbsoluteHttpUrl(API_BASE_URL)) {
     const errorMsg = `API_BASE_URL is not absolute: "${API_BASE_URL}". Expected http:// or https:// URL.`;
     console.error('[apiFetch]', errorMsg);
-    console.error('[apiFetch] Current window.location:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+    console.error(
+      '[apiFetch] Current window.location:',
+      typeof window !== 'undefined' ? window.location.href : 'N/A'
+    );
     throw new Error(errorMsg);
   }
 
@@ -563,7 +567,6 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}, retry = tru
       throw new Error(`Network request failed: ${retryMsg}`);
     }
   }
-  
 
   if (response.status === 401 && retry && refreshToken) {
     const refreshed = await performRefresh();
@@ -1394,7 +1397,9 @@ export const api = {
     return extractPaginatedData(response);
   },
   listTeachers: async () => {
-    const response = await apiFetch<PaginatedResponse<TeacherProfile> | TeacherProfile[]>('/teachers');
+    const response = await apiFetch<PaginatedResponse<TeacherProfile> | TeacherProfile[]>(
+      '/teachers'
+    );
     const teachers = extractPaginatedData(response);
     return teachers.map(transformTeacher);
   },
@@ -1402,7 +1407,10 @@ export const api = {
     const teacher = await apiFetch<TeacherProfile>(`/teachers/${id}`);
     return transformTeacher(teacher);
   },
-  updateTeacher: (id: string, payload: { name?: string; email?: string; subjects?: string[]; assignedClasses?: string[] }) =>
+  updateTeacher: (
+    id: string,
+    payload: { name?: string; email?: string; subjects?: string[]; assignedClasses?: string[] }
+  ) =>
     apiFetch<TeacherProfile>(`/teachers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
@@ -1412,7 +1420,9 @@ export const api = {
       method: 'DELETE'
     }),
   listStudents: async () => {
-    const response = await apiFetch<PaginatedResponse<StudentRecord> | StudentRecord[]>('/students');
+    const response = await apiFetch<PaginatedResponse<StudentRecord> | StudentRecord[]>(
+      '/students'
+    );
     const students = extractPaginatedData(response);
     return students.map(transformStudent);
   },
@@ -1420,14 +1430,17 @@ export const api = {
     const student = await apiFetch<StudentRecord>(`/students/${id}`);
     return transformStudent(student);
   },
-  updateStudent: (id: string, payload: {
-    firstName?: string;
-    lastName?: string;
-    dateOfBirth?: string;
-    classId?: string;
-    admissionNumber?: string;
-    parentContacts?: Array<{ name: string; relationship: string; phone: string }>;
-  }) =>
+  updateStudent: (
+    id: string,
+    payload: {
+      firstName?: string;
+      lastName?: string;
+      dateOfBirth?: string;
+      classId?: string;
+      admissionNumber?: string;
+      parentContacts?: Array<{ name: string; relationship: string; phone: string }>;
+    }
+  ) =>
     apiFetch<StudentRecord>(`/students/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload)
@@ -1621,20 +1634,25 @@ export const api = {
   // Audit and activity endpoints
   getActivityHistory: (userId?: string) => {
     const params = userId ? `?userId=${userId}` : '';
-    return apiFetch<Array<{
-      id: string;
-      action: string;
-      description: string;
-      timestamp: string;
-      metadata: Record<string, unknown>;
-    }>>(`/audit/activity${params}`);
+    return apiFetch<
+      Array<{
+        id: string;
+        action: string;
+        description: string;
+        timestamp: string;
+        metadata: Record<string, unknown>;
+      }>
+    >(`/audit/activity${params}`);
   },
-  getAuditLogs: (userId?: string, filters?: {
-    entityType?: string;
-    from?: string;
-    to?: string;
-    limit?: number;
-  }) => {
+  getAuditLogs: (
+    userId?: string,
+    filters?: {
+      entityType?: string;
+      from?: string;
+      to?: string;
+      limit?: number;
+    }
+  ) => {
     const searchParams = new URLSearchParams();
     if (userId) searchParams.set('userId', userId);
     if (filters?.entityType) searchParams.set('entityType', filters.entityType);
@@ -1645,7 +1663,10 @@ export const api = {
     return apiFetch<AuditLogEntry[]>(`/audit/logs${params}`);
   },
   // Search
-  search: (query: string, options?: { limit?: number; types?: ('student' | 'teacher' | 'class' | 'subject')[] }) => {
+  search: (
+    query: string,
+    options?: { limit?: number; types?: ('student' | 'teacher' | 'class' | 'subject')[] }
+  ) => {
     const searchParams = new URLSearchParams();
     searchParams.set('q', query);
     if (options?.limit) searchParams.set('limit', String(options.limit));

@@ -150,11 +150,7 @@ export default function AdminAttendancePage() {
               options={classes.map((c) => ({ label: c.name, value: c.id }))}
               disabled={classesLoading || classes.length === 0}
             />
-            <DatePicker
-              label="Date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
+            <DatePicker label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
 

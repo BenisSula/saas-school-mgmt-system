@@ -7,11 +7,14 @@ interface HealthCheckResult {
 }
 
 export function HealthBanner() {
-  const [health, setHealth] = useState<HealthCheckResult>({ status: 'checking', message: 'Checking server connection...' });
+  const [health, setHealth] = useState<HealthCheckResult>({
+    status: 'checking',
+    message: 'Checking server connection...'
+  });
 
   const checkHealth = async () => {
     setHealth({ status: 'checking', message: 'Checking server connection...' });
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
@@ -35,18 +38,21 @@ export function HealthBanner() {
       // Health check failed
       setHealth({
         status: 'error',
-        message: "We can't reach the authentication server. Try again in a moment. (If you're a developer, check VITE_API_BASE_URL and that the backend is running on port 3002.)"
+        message:
+          "We can't reach the authentication server. Try again in a moment. (If you're a developer, check VITE_API_BASE_URL and that the backend is running on port 3002.)"
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         setHealth({
           status: 'error',
-          message: "Connection timeout. The server may be slow or unavailable. (If you're a developer, check that the backend is running on port 3002.)"
+          message:
+            "Connection timeout. The server may be slow or unavailable. (If you're a developer, check that the backend is running on port 3002.)"
         });
       } else {
         setHealth({
           status: 'error',
-          message: "We can't reach the authentication server. Try again in a moment. (If you're a developer, check VITE_API_BASE_URL and that the backend is running on port 3002.)"
+          message:
+            "We can't reach the authentication server. Try again in a moment. (If you're a developer, check VITE_API_BASE_URL and that the backend is running on port 3002.)"
         });
       }
     }
@@ -87,4 +93,3 @@ export function HealthBanner() {
     </div>
   );
 }
-
