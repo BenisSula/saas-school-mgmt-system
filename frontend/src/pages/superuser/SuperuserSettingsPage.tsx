@@ -55,7 +55,10 @@ const defaultSettings: PlatformSettings = {
 export function SuperuserSettingsPage() {
   const [settings, setSettings] = useState<PlatformSettings>(defaultSettings);
   const [saving, setSaving] = useState<boolean>(false);
-  const [saveStatus, setSaveStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [saveStatus, setSaveStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const handleSave = async () => {
     setSaving(true);

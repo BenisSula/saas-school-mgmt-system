@@ -18,7 +18,7 @@ export default function SuperuserSubscriptionsPage() {
 
   const { data: schoolsData, isLoading: schoolsLoading } = useSchools();
 
-  const schools = schoolsData || [];
+  const schools = useMemo(() => schoolsData || [], [schoolsData]);
 
   const updateSubscriptionMutation = useMutationWithInvalidation(
     async (payload: { schoolId: string; subscriptionType: SubscriptionTier }) => {
@@ -26,7 +26,7 @@ export default function SuperuserSubscriptionsPage() {
         subscriptionType: payload.subscriptionType
       });
     },
-    [queryKeys.superuser.schools(), queryKeys.superuser.subscriptions()],
+    [queryKeys.superuser.schools(), queryKeys.superuser.subscriptions()] as unknown as unknown[][],
     { successMessage: 'Subscription updated successfully' }
   );
 
@@ -49,7 +49,7 @@ export default function SuperuserSubscriptionsPage() {
     const revenueByTier = new Map<SubscriptionTier, number>();
     schools.forEach((school) => {
       const tier = school.subscriptionType || 'trial';
-      const monthlyPrice = tier === 'paid' ? 99 : tier === 'premium' ? 199 : 0;
+      const monthlyPrice = tier === 'paid' ? 99 : 0;
       revenueByTier.set(tier, (revenueByTier.get(tier) || 0) + monthlyPrice);
     });
     return Array.from(revenueByTier.entries())
@@ -62,7 +62,7 @@ export default function SuperuserSubscriptionsPage() {
 
   const stats = useMemo(() => {
     const totalRevenue = revenueData.reduce((sum, item) => sum + item.value, 0);
-    const paidSubscriptions = schools.filter((s) => s.subscriptionType === 'paid' || s.subscriptionType === 'premium').length;
+    const paidSubscriptions = schools.filter((s) => s.subscriptionType === 'paid').length;
     const trialSubscriptions = schools.filter((s) => s.subscriptionType === 'trial').length;
 
     return {
@@ -174,24 +174,16 @@ export default function SuperuserSubscriptionsPage() {
         {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <BarChart
-              data={subscriptionBreakdown}
-              title="Subscription Distribution"
-              height={250}
-            />
+            <BarChart data={subscriptionBreakdown} title="Subscription Distribution" height={250} />
           </div>
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <PieChart
-              data={revenueData}
-              title="Revenue by Tier"
-              size={250}
-            />
+            <PieChart data={revenueData} title="Revenue by Tier" size={250} />
           </div>
         </div>
 
         {/* Subscriptions Table */}
         <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <DataTable
+          <DataTable<PlatformSchool>
             data={schools}
             columns={subscriptionColumns}
             pagination={{ pageSize: 10, showSizeSelector: true }}

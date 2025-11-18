@@ -44,4 +44,3 @@ export function useProfileSync() {
     return () => clearTimeout(timeoutId);
   }, [user, isAuthenticated]);
 }
-

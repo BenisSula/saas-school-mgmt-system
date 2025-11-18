@@ -38,16 +38,15 @@ export default function HODDashboardPage() {
     }));
   }, [department]);
 
-  const teacherColumns: DataTableColumn<TeacherProfile>[] = useMemo(
-    () => {
-      if (!department) return [];
-      return [
-        {
-          key: 'name',
-          header: 'Teacher Name',
-          render: (row) => row.name,
-          sortable: true
-        },
+  const teacherColumns: DataTableColumn<TeacherProfile>[] = useMemo(() => {
+    if (!department) return [];
+    return [
+      {
+        key: 'name',
+        header: 'Teacher Name',
+        render: (row) => row.name,
+        sortable: true
+      },
       {
         key: 'email',
         header: 'Email',
@@ -80,10 +79,8 @@ export default function HODDashboardPage() {
         header: 'Classes',
         render: (row) => `${row.assigned_classes.length} classes`
       }
-      ];
-    },
-    [department]
-  );
+    ];
+  }, [department]);
 
   // Early returns after all hooks
   if (loading) {
@@ -144,9 +141,15 @@ export default function HODDashboardPage() {
           />
           <StatCard
             title="Avg Subjects/Teacher"
-            value={department.totalTeachers > 0 
-              ? Math.round((department.teachers.reduce((sum, t) => sum + t.subjects.length, 0) / department.totalTeachers) * 10) / 10
-              : 0}
+            value={
+              department.totalTeachers > 0
+                ? Math.round(
+                    (department.teachers.reduce((sum, t) => sum + t.subjects.length, 0) /
+                      department.totalTeachers) *
+                      10
+                  ) / 10
+                : 0
+            }
             icon={<TrendingUp className="h-5 w-5" />}
             description="Average load"
           />
@@ -156,20 +159,12 @@ export default function HODDashboardPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           {teacherDistribution.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <BarChart
-                data={teacherDistribution}
-                title="Teachers by Subject Count"
-                height={250}
-              />
+              <BarChart data={teacherDistribution} title="Teachers by Subject Count" height={250} />
             </div>
           )}
           {subjectCoverage.length > 0 && (
             <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-              <PieChart
-                data={subjectCoverage}
-                title="Subject Coverage"
-                size={250}
-              />
+              <PieChart data={subjectCoverage} title="Subject Coverage" size={250} />
             </div>
           )}
         </div>
@@ -184,7 +179,7 @@ export default function HODDashboardPage() {
               Teachers under your oversight in the {department.department} department.
             </p>
           </header>
-          <DataTable
+          <DataTable<TeacherProfile>
             data={department.teachers}
             columns={teacherColumns}
             pagination={{ pageSize: 10, showSizeSelector: true }}
@@ -195,4 +190,3 @@ export default function HODDashboardPage() {
     </RouteMeta>
   );
 }
-

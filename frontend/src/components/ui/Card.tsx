@@ -21,22 +21,28 @@ const paddingClasses = {
   lg: 'p-6 sm:p-8'
 };
 
-export function Card({ children, className = '', hoverable = false, onClick, padding = 'md' }: CardProps) {
+export function Card({
+  children,
+  className = '',
+  hoverable = false,
+  onClick,
+  padding = 'md'
+}: CardProps) {
   const baseClasses = `card-base ${paddingClasses[padding]} ${onClick ? 'cursor-pointer' : ''} ${className}`;
   const Component = hoverable || onClick ? motion.div : 'div';
 
-  const props = hoverable || onClick
-    ? {
-        variants: fadeIn,
-        initial: 'hidden',
-        animate: 'visible',
-        whileHover: hoverable ? cardHover.hover : undefined,
-        whileTap: onClick ? cardHover.tap : undefined,
-        onClick,
-        className: baseClasses
-      }
-    : { className: baseClasses };
+  const props =
+    hoverable || onClick
+      ? {
+          variants: fadeIn,
+          initial: 'hidden',
+          animate: 'visible',
+          whileHover: hoverable ? cardHover.hover : undefined,
+          whileTap: onClick ? cardHover.tap : undefined,
+          onClick,
+          className: baseClasses
+        }
+      : { className: baseClasses };
 
   return <Component {...props}>{children}</Component>;
 }
-

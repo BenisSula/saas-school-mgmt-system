@@ -73,4 +73,3 @@ export function useMutationWithInvalidation<TData, TVariables>(
     }
   });
 }
-

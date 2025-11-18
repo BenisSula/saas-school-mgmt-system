@@ -54,4 +54,3 @@ export function exportToJSON<T>(data: T[], filename: string): void {
   link.click();
   document.body.removeChild(link);
 }
-

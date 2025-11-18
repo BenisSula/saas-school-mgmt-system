@@ -86,7 +86,7 @@ export function getCsrfToken(): string | null {
   // CSRF token is stored in httpOnly cookie by backend
   // We need to read it from the cookie
   if (typeof document === 'undefined') return null;
-  
+
   const cookies = document.cookie.split(';');
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
@@ -115,13 +115,13 @@ export function isValidTokenFormat(token: string): boolean {
   if (!token || typeof token !== 'string') {
     return false;
   }
-  
+
   // JWT tokens have 3 parts separated by dots
   const parts = token.split('.');
   if (parts.length !== 3) {
     return false;
   }
-  
+
   // Each part should be base64url encoded
   try {
     parts.forEach((part) => {
@@ -135,4 +135,3 @@ export function isValidTokenFormat(token: string): boolean {
     return false;
   }
 }
-

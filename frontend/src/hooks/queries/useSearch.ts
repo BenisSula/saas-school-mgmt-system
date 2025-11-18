@@ -16,4 +16,3 @@ export function useSearch(
     staleTime: 30000 // Cache for 30 seconds
   });
 }
-

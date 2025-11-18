@@ -368,7 +368,7 @@ describe('Login/Register Integration Tests', () => {
         const errorElements = screen.queryAllByText(/email already exists/i);
         if (errorElements.length === 0) {
           // Try case-insensitive search
-          const caseInsensitive = screen.queryAllByText((content, element) => {
+          const caseInsensitive = screen.queryAllByText((_content, element) => {
             return element?.textContent?.toLowerCase().includes('email already exists') ?? false;
           });
           expect(caseInsensitive.length).toBeGreaterThan(0);

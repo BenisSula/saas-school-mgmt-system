@@ -39,7 +39,9 @@ export function StatCard({ title, value, change, icon, description, trend }: Sta
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--brand-muted)]">
             {title}
           </p>
-          <p className="mt-2 text-xl font-bold text-[var(--brand-surface-contrast)] sm:text-2xl">{value}</p>
+          <p className="mt-2 text-xl font-bold text-[var(--brand-surface-contrast)] sm:text-2xl">
+            {value}
+          </p>
           {change && (
             <div className="mt-2 flex items-center gap-1">
               {trendIcon}
@@ -57,9 +59,7 @@ export function StatCard({ title, value, change, icon, description, trend }: Sta
               </span>
             </div>
           )}
-          {description && (
-            <p className="mt-2 text-xs text-[var(--brand-muted)]">{description}</p>
-          )}
+          {description && <p className="mt-2 text-xs text-[var(--brand-muted)]">{description}</p>}
         </div>
         {icon && (
           <motion.div
@@ -74,4 +74,3 @@ export function StatCard({ title, value, change, icon, description, trend }: Sta
     </motion.div>
   );
 }
-

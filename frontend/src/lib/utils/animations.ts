@@ -121,4 +121,3 @@ export const transitions = {
   slow: { duration: 0.3, ease: [0.4, 0, 0.2, 1] },
   spring: { type: 'spring', stiffness: 300, damping: 30 }
 } as const;
-

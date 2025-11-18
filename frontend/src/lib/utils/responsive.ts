@@ -52,4 +52,3 @@ export const typography = {
   '3xl': { fontSize: '1.875rem', lineHeight: '2.25rem' }, // 30px
   '4xl': { fontSize: '2.25rem', lineHeight: '2.5rem' } // 36px
 } as const;
-

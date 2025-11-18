@@ -59,7 +59,9 @@ export function ProfileLayout({
           <div className="flex gap-4">
             {avatar && <div className="flex-shrink-0">{avatar}</div>}
             <div>
-              <h1 className="text-2xl font-semibold text-[var(--brand-surface-contrast)]">{title}</h1>
+              <h1 className="text-2xl font-semibold text-[var(--brand-surface-contrast)]">
+                {title}
+              </h1>
               {subtitle && <p className="mt-1 text-sm text-[var(--brand-muted)]">{subtitle}</p>}
             </div>
           </div>
@@ -100,4 +102,3 @@ export function ProfileLayout({
     </RouteMeta>
   );
 }
-

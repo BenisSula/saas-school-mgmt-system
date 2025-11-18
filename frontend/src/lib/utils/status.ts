@@ -25,4 +25,3 @@ export function formatStatus(status: string | null | undefined): string {
   if (!status) return 'Unknown';
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
-

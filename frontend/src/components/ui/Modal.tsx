@@ -98,7 +98,9 @@ export function Modal({ title, isOpen, onClose, children, footer, initialFocusRe
                 ✕
               </Button>
             </header>
-            <div className="px-4 py-4 text-sm text-[var(--brand-text-primary)] sm:px-6">{children}</div>
+            <div className="px-4 py-4 text-sm text-[var(--brand-text-primary)] sm:px-6">
+              {children}
+            </div>
             {footer ? (
               <footer className="flex flex-col items-stretch gap-2 border-t border-[var(--brand-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-4">
                 {footer}

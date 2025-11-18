@@ -10,7 +10,12 @@ import { useProfileData } from '../../hooks/useProfileData';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { api, type StudentProfileDetail, type StudentSubjectSummary, type SchoolClass } from '../../lib/api';
+import {
+  api,
+  type StudentProfileDetail,
+  type StudentSubjectSummary,
+  type SchoolClass
+} from '../../lib/api';
 import { deriveContacts } from '../../lib/utils/data';
 import { formatDateTime } from '../../lib/utils/date';
 
@@ -231,7 +236,9 @@ export default function StudentProfilePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setContacts((current) => [...current, { label: '', value: '' }])}
+                      onClick={() =>
+                        setContacts((current) => [...current, { label: '', value: '' }])
+                      }
                     >
                       Add contact
                     </Button>
@@ -336,7 +343,9 @@ export default function StudentProfilePage() {
           <Section
             isEmpty={true}
             emptyMessage="Academic history will be displayed here when available"
-          />
+          >
+            {null}
+          </Section>
         )
       },
       {
@@ -378,13 +387,30 @@ export default function StudentProfilePage() {
         )
       }
     ],
-    [displayProfile, contacts, classes, promotionClassId, promotionNotes, isEditing, savingProfile, submittingPromotion, activities, auditLogs, uploads, setUploads, handleProfileSubmit, handlePromotionSubmit]
+    [
+      displayProfile,
+      contacts,
+      classes,
+      promotionClassId,
+      promotionNotes,
+      isEditing,
+      savingProfile,
+      submittingPromotion,
+      activities,
+      auditLogs,
+      uploads,
+      setUploads,
+      handleProfileSubmit,
+      handlePromotionSubmit
+    ]
   );
 
   return (
     <ProfileLayout
       title={displayProfile ? `${displayProfile.firstName} ${displayProfile.lastName}` : 'Profile'}
-      subtitle={displayProfile?.admissionNumber ? `Admission: ${displayProfile.admissionNumber}` : undefined}
+      subtitle={
+        displayProfile?.admissionNumber ? `Admission: ${displayProfile.admissionNumber}` : undefined
+      }
       loading={loading}
       error={error}
       sections={sections}

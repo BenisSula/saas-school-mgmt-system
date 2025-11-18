@@ -112,10 +112,7 @@ export function SuperuserReportsPage() {
 
         {error ? <StatusBanner status="error" message={error} /> : null}
 
-        <section
-          className="grid gap-4 md:grid-cols-2"
-          aria-label="Available reports"
-        >
+        <section className="grid gap-4 md:grid-cols-2" aria-label="Available reports">
           {reportTypes.map((report) => (
             <div
               key={report.id}
@@ -131,9 +128,7 @@ export function SuperuserReportsPage() {
                       {report.title}
                     </h2>
                   </div>
-                  <p className="mt-2 text-sm text-[var(--brand-muted)]">
-                    {report.description}
-                  </p>
+                  <p className="mt-2 text-sm text-[var(--brand-muted)]">{report.description}</p>
                 </div>
               </div>
               <div className="mt-4 flex gap-2">

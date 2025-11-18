@@ -56,7 +56,7 @@ export function TestLoginPage() {
     setIsLoading(true);
 
     try {
-      await loginUser(testEmail, testPassword);
+      await loginUser({ email: testEmail, password: testPassword });
       toast.success('Login successful!');
       // Wait a moment for user state to update, then navigate
       setTimeout(() => {
@@ -78,7 +78,7 @@ export function TestLoginPage() {
 
     setIsLoading(true);
     try {
-      await loginUser(email, password);
+      await loginUser({ email, password });
       toast.success('Login successful!');
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
@@ -221,11 +221,7 @@ export function TestLoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--brand-muted)] hover:text-[var(--brand-surface-contrast)]"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
@@ -250,10 +246,7 @@ export function TestLoginPage() {
             </form>
 
             <div className="mt-4 text-center">
-              <a
-                href="/auth/login"
-                className="text-sm text-[var(--brand-primary)] hover:underline"
-              >
+              <a href="/auth/login" className="text-sm text-[var(--brand-primary)] hover:underline">
                 Go to full login page
               </a>
             </div>
@@ -286,4 +279,3 @@ export function TestLoginPage() {
 }
 
 export default TestLoginPage;
-

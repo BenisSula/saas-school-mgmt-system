@@ -517,11 +517,9 @@ export function SuperuserManageSchoolsPage() {
                 </p>
               </div>
               <div className="rounded-lg border border-[var(--brand-border)]/60 bg-slate-950/40 p-4">
-                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">
-                  Created
-                </p>
+                <p className="text-xs uppercase tracking-wide text-[var(--brand-muted)]">Created</p>
                 <p className="mt-1 text-sm text-[var(--brand-surface-contrast)]">
-                    {formatDate(selectedSchoolForAnalytics.createdAt)}
+                  {formatDate(selectedSchoolForAnalytics.createdAt)}
                 </p>
               </div>
             </div>

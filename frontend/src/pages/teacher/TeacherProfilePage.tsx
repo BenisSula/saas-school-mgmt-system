@@ -35,11 +35,12 @@ export default function TeacherProfilePage() {
     [teacherId]
   );
 
-  const { profile, loading, error, activities, auditLogs, uploads, setUploads } = useProfileData<TeacherProfileDetail>({
-    userId: teacherId || undefined,
-    profileLoader,
-    enabled: true
-  });
+  const { profile, loading, error, activities, auditLogs, uploads, setUploads } =
+    useProfileData<TeacherProfileDetail>({
+      userId: teacherId || undefined,
+      profileLoader,
+      enabled: true
+    });
 
   const sections: ProfileSection[] = useMemo(
     () => [

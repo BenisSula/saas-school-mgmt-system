@@ -15,11 +15,13 @@ export default function AdminDepartmentAnalyticsPage() {
   const { data: teachersData } = useTeachers();
   const { data: studentsData } = useStudents();
   const { data: classesData } = useClasses();
-  const { data: analyticsData } = useDepartmentAnalytics(selectedDepartment !== 'all' ? selectedDepartment : undefined);
+  const { data: analyticsData } = useDepartmentAnalytics(
+    selectedDepartment !== 'all' ? selectedDepartment : undefined
+  );
 
-  const teachers = teachersData || [];
-  const students = studentsData || [];
-  const classes = classesData || [];
+  const teachers = useMemo(() => teachersData || [], [teachersData]);
+  const students = useMemo(() => studentsData || [], [studentsData]);
+  const classes = useMemo(() => classesData || [], [classesData]);
 
   // Extract departments from teachers' subjects
   const departments = useMemo(() => {
@@ -152,22 +154,13 @@ export default function AdminDepartmentAnalyticsPage() {
             />
           </div>
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <PieChart
-              data={studentDistribution}
-              title="Student Distribution by Class"
-              size={250}
-            />
+            <PieChart data={studentDistribution} title="Student Distribution by Class" size={250} />
           </div>
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm lg:col-span-2">
-            <LineChart
-              data={classSizeTrend}
-              title="Class Size Trend"
-              height={200}
-            />
+            <LineChart data={classSizeTrend} title="Class Size Trend" height={200} />
           </div>
         </div>
       </div>
     </RouteMeta>
   );
 }
-

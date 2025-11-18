@@ -18,23 +18,24 @@ export default function AdminExamConfigPage() {
 
   const { data: examsData, isLoading: examsLoading } = useExams();
 
-  const exams = examsData || [];
+  const exams = useMemo(() => examsData || [], [examsData]);
 
   const createExamMutation = useMutationWithInvalidation(
     async (payload: { name: string; description?: string; examDate?: string }) => {
       // TODO: Implement backend endpoint
       await api.createExam(payload);
     },
-    [queryKeys.admin.exams()],
+    [queryKeys.admin.exams()] as unknown as unknown[][],
     { successMessage: 'Exam created successfully' }
   );
 
   const deleteExamMutation = useMutationWithInvalidation(
-    async (examId: string) => {
+    async () => {
       // TODO: Implement backend endpoint
-      await api.deleteExam(examId);
+      // Note: deleteExam API endpoint not yet implemented
+      throw new Error('Delete exam functionality not yet implemented');
     },
-    [queryKeys.admin.exams()],
+    [queryKeys.admin.exams()] as unknown as unknown[][],
     { successMessage: 'Exam deleted successfully' }
   );
 
@@ -65,11 +66,7 @@ export default function AdminExamConfigPage() {
             <Button size="sm" variant="outline">
               Edit
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => deleteExamMutation.mutate(row.id)}
-            >
+            <Button size="sm" variant="ghost" onClick={() => deleteExamMutation.mutate(row.id)}>
               Delete
             </Button>
           </div>
@@ -112,7 +109,7 @@ export default function AdminExamConfigPage() {
 
         {/* Exams Table */}
         <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <DataTable
+          <DataTable<ExamSummary>
             data={exams}
             columns={examColumns}
             pagination={{ pageSize: 10, showSizeSelector: true }}
@@ -190,4 +187,3 @@ export default function AdminExamConfigPage() {
     </RouteMeta>
   );
 }
-

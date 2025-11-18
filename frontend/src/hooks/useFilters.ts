@@ -42,4 +42,3 @@ export function useFilters<T extends BaseFilters>(
     setFilters
   };
 }
-

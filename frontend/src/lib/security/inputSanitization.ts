@@ -23,20 +23,20 @@ export function sanitizeForDisplay(input: unknown): string {
   if (input == null) {
     return '';
   }
-  
+
   if (typeof input !== 'string') {
     return String(input);
   }
-  
+
   // Remove null bytes
   let sanitized = input.replace(/\0/g, '');
-  
+
   // Escape HTML
   sanitized = escapeHtml(sanitized);
-  
+
   // Trim and limit length
   sanitized = sanitized.trim().slice(0, 10000);
-  
+
   return sanitized;
 }
 
@@ -70,11 +70,11 @@ export function sanitizeIdentifier(input: string): string {
 export function sanitizeEmail(email: string): string {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const trimmed = email.trim().toLowerCase();
-  
+
   if (!emailRegex.test(trimmed)) {
     throw new Error('Invalid email format');
   }
-  
+
   return trimmed.slice(0, 255);
 }
 
@@ -83,19 +83,29 @@ export function sanitizeEmail(email: string): string {
  */
 export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
   const sanitized = { ...obj };
-  
+
   for (const key in sanitized) {
     if (typeof sanitized[key] === 'string') {
       sanitized[key] = sanitizeForDisplay(sanitized[key] as string) as T[Extract<keyof T, string>];
-    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null && !Array.isArray(sanitized[key])) {
-      sanitized[key] = sanitizeObject(sanitized[key] as Record<string, unknown>) as T[Extract<keyof T, string>];
+    } else if (
+      typeof sanitized[key] === 'object' &&
+      sanitized[key] !== null &&
+      !Array.isArray(sanitized[key])
+    ) {
+      sanitized[key] = sanitizeObject(sanitized[key] as Record<string, unknown>) as T[Extract<
+        keyof T,
+        string
+      >];
     } else if (Array.isArray(sanitized[key])) {
       sanitized[key] = (sanitized[key] as unknown[]).map((item) =>
-        typeof item === 'string' ? sanitizeForDisplay(item) : typeof item === 'object' && item !== null ? sanitizeObject(item as Record<string, unknown>) : item
+        typeof item === 'string'
+          ? sanitizeForDisplay(item)
+          : typeof item === 'object' && item !== null
+            ? sanitizeObject(item as Record<string, unknown>)
+            : item
       ) as T[Extract<keyof T, string>];
     }
   }
-  
+
   return sanitized;
 }
-

@@ -52,7 +52,9 @@ const TeachersManagementPage = lazy(() => import('./pages/admin/TeachersManageme
 const StudentsManagementPage = lazy(() => import('./pages/admin/StudentsManagementPage'));
 const HODsManagementPage = lazy(() => import('./pages/admin/HODsManagementPage'));
 const AdminClassAssignmentPage = lazy(() => import('./pages/admin/AdminClassAssignmentPage'));
-const AdminDepartmentAnalyticsPage = lazy(() => import('./pages/admin/AdminDepartmentAnalyticsPage'));
+const AdminDepartmentAnalyticsPage = lazy(
+  () => import('./pages/admin/AdminDepartmentAnalyticsPage')
+);
 const HODProfilePage = lazy(() => import('./pages/hod/HODProfilePage'));
 const HODDashboardPage = lazy(() => import('./pages/hod/HODDashboardPage'));
 const StudentDashboardPage = lazy(() => import('./pages/student/StudentDashboardPage'));
@@ -62,7 +64,7 @@ function App() {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Sync profile data after login/registration
   useProfileSync();
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutationWithInvalidation, queryKeys } from '../../hooks/useQuery';
 import { useClasses } from '../../hooks/queries/useAdminQueries';
 import { useQuery } from '../../hooks/useQuery';
@@ -13,7 +13,7 @@ import { defaultDate } from '../../lib/utils/date';
 
 type AttendanceStatus = 'present' | 'absent' | 'late';
 
-interface AttendanceRow {
+interface AttendanceRow extends Record<string, unknown> {
   studentId: string;
   name: string;
   status: AttendanceStatus;
@@ -43,7 +43,7 @@ export default function AdminAttendancePage() {
     { enabled: !!selectedClassId }
   );
 
-  const students = studentsData || [];
+  const students = useMemo(() => studentsData || [], [studentsData]);
 
   // Initialize rows when students load
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function AdminAttendancePage() {
     async (records: AttendanceMark[]) => {
       await api.markAttendance(records);
     },
-    [queryKeys.admin.attendance()],
+    [queryKeys.admin.attendance()] as unknown as unknown[][],
     { successMessage: 'Attendance saved successfully' }
   );
 
@@ -150,11 +150,7 @@ export default function AdminAttendancePage() {
               options={classes.map((c) => ({ label: c.name, value: c.id }))}
               disabled={classesLoading || classes.length === 0}
             />
-            <DatePicker
-              label="Date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
+            <DatePicker label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
 
@@ -188,7 +184,7 @@ export default function AdminAttendancePage() {
                 Save Attendance
               </Button>
             </div>
-            <DataTable
+            <DataTable<AttendanceRow>
               data={rows}
               columns={attendanceColumns}
               pagination={{ pageSize: 20, showSizeSelector: true }}

@@ -26,20 +26,27 @@ export default function SuperuserUsageMonitoringPage() {
   const { data: platformUsage } = useUsage(); // Platform-wide usage
   const { data: tenantUsage } = useUsage(selectedTenantId !== 'all' ? selectedTenantId : undefined);
 
-  const schools = schoolsData || [];
+  const schools = useMemo(() => schoolsData || [], [schoolsData]);
 
   // Generate usage data for each tenant
   const tenantUsageData: UsageData[] = useMemo(() => {
     // If a specific tenant is selected, use that tenant's usage data
-    if (selectedTenantId !== 'all' && tenantUsage && 'tenantId' in tenantUsage) {
-      return [{
-        tenantId: tenantUsage.tenantId,
-        tenantName: schools.find(s => s.id === tenantUsage.tenantId)?.name || 'Unknown',
-        activeUsers: tenantUsage.activeUsers || 0,
-        storageUsed: tenantUsage.storageUsed || 0,
-        apiCalls: tenantUsage.apiCalls || 0,
-        lastActivity: tenantUsage.lastActivity || new Date().toISOString()
-      }];
+    if (
+      selectedTenantId !== 'all' &&
+      tenantUsage &&
+      'tenantId' in tenantUsage &&
+      tenantUsage.tenantId
+    ) {
+      return [
+        {
+          tenantId: tenantUsage.tenantId,
+          tenantName: schools.find((s) => s.id === tenantUsage.tenantId)?.name || 'Unknown',
+          activeUsers: tenantUsage.activeUsers || 0,
+          storageUsed: tenantUsage.storageUsed || 0,
+          apiCalls: tenantUsage.apiCalls || 0,
+          lastActivity: tenantUsage.lastActivity || new Date().toISOString()
+        }
+      ];
     }
 
     // For all tenants, fetch individual usage or use school data
@@ -82,9 +89,10 @@ export default function SuperuserUsageMonitoringPage() {
         totalActiveUsers: platformUsage.totalActiveUsers || 0,
         totalStorage: Math.round((platformUsage.totalStorage || 0) * 10) / 10,
         totalApiCalls: platformUsage.totalApiCalls || 0,
-        avgStoragePerTenant: schools.length > 0
-          ? Math.round(((platformUsage.totalStorage || 0) / schools.length) * 10) / 10
-          : 0
+        avgStoragePerTenant:
+          schools.length > 0
+            ? Math.round(((platformUsage.totalStorage || 0) / schools.length) * 10) / 10
+            : 0
       };
     }
 
@@ -196,24 +204,16 @@ export default function SuperuserUsageMonitoringPage() {
         {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <BarChart
-              data={storageUsage}
-              title="Storage Usage by Tenant (Top 10)"
-              height={300}
-            />
+            <BarChart data={storageUsage} title="Storage Usage by Tenant (Top 10)" height={300} />
           </div>
           <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-            <LineChart
-              data={apiCallsTrend}
-              title="API Calls Trend"
-              height={300}
-            />
+            <LineChart data={apiCallsTrend} title="API Calls Trend" height={300} />
           </div>
         </div>
 
         {/* Usage Table */}
         <div className="rounded-xl border border-[var(--brand-border)] bg-[var(--brand-surface)]/80 p-6 shadow-sm">
-          <DataTable
+          <DataTable<UsageData>
             data={tenantUsageData}
             columns={usageColumns}
             pagination={{ pageSize: 10, showSizeSelector: true }}
@@ -225,4 +225,3 @@ export default function SuperuserUsageMonitoringPage() {
     </RouteMeta>
   );
 }
-

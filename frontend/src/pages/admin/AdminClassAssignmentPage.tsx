@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutationWithInvalidation, queryKeys } from '../../hooks/useQuery';
-import { useClasses, useStudents, useTeachers, useSubjects } from '../../hooks/queries/useAdminQueries';
+import {
+  useClasses,
+  useStudents,
+  useTeachers,
+  useSubjects
+} from '../../hooks/queries/useAdminQueries';
 import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
@@ -42,7 +47,8 @@ export default function AdminClassAssignmentPage() {
   );
 
   const classStudents = useMemo(
-    () => students.filter((s) => s.class_uuid === selectedClassId || s.class_id === selectedClassId),
+    () =>
+      students.filter((s) => s.class_uuid === selectedClassId || s.class_id === selectedClassId),
     [students, selectedClassId]
   );
 
@@ -50,20 +56,24 @@ export default function AdminClassAssignmentPage() {
     async (payload: { studentId: string; classId: string }) => {
       await api.updateStudent(payload.studentId, { classId: payload.classId });
     },
-    [queryKeys.admin.students(), queryKeys.admin.classes()],
+    [queryKeys.admin.students(), queryKeys.admin.classes()] as unknown as unknown[][],
     { successMessage: 'Student assigned to class successfully' }
   );
 
   const assignTeacherMutation = useMutationWithInvalidation(
-    async (payload: { teacherId: string; classId: string; subjectId: string; isClassTeacher: boolean }) => {
-      await api.admin.assignTeacher({
-        teacherId: payload.teacherId,
+    async (payload: {
+      teacherId: string;
+      classId: string;
+      subjectId: string;
+      isClassTeacher: boolean;
+    }) => {
+      await api.admin.assignTeacher(payload.teacherId, {
         classId: payload.classId,
         subjectId: payload.subjectId,
         isClassTeacher: payload.isClassTeacher
       });
     },
-    [queryKeys.admin.teachers(), queryKeys.admin.classes()],
+    [queryKeys.admin.teachers(), queryKeys.admin.classes()] as unknown as unknown[][],
     { successMessage: 'Teacher assigned successfully' }
   );
 
@@ -171,7 +181,7 @@ export default function AdminClassAssignmentPage() {
             <h2 className="mb-4 text-lg font-semibold text-[var(--brand-surface-contrast)]">
               Students in {selectedClass?.name}
             </h2>
-            <DataTable
+            <DataTable<StudentRecord>
               data={classStudents}
               columns={studentColumns}
               pagination={{ pageSize: 10, showSizeSelector: true }}
@@ -195,7 +205,9 @@ export default function AdminClassAssignmentPage() {
               <Select
                 label="Student"
                 value={assignmentForm.studentId || ''}
-                onChange={(e) => setAssignmentForm({ ...assignmentForm, studentId: e.target.value })}
+                onChange={(e) =>
+                  setAssignmentForm({ ...assignmentForm, studentId: e.target.value })
+                }
                 options={students.map((s) => ({
                   label: `${s.first_name} ${s.last_name}`,
                   value: s.id
@@ -211,10 +223,7 @@ export default function AdminClassAssignmentPage() {
                 <Button variant="outline" onClick={() => setShowStudentModal(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleAssignStudent}
-                  loading={assignStudentMutation.isPending}
-                >
+                <Button onClick={handleAssignStudent} loading={assignStudentMutation.isPending}>
                   Assign
                 </Button>
               </div>
@@ -236,7 +245,9 @@ export default function AdminClassAssignmentPage() {
               <Select
                 label="Teacher"
                 value={assignmentForm.teacherId || ''}
-                onChange={(e) => setAssignmentForm({ ...assignmentForm, teacherId: e.target.value })}
+                onChange={(e) =>
+                  setAssignmentForm({ ...assignmentForm, teacherId: e.target.value })
+                }
                 options={teachers.map((t) => ({ label: t.name, value: t.id }))}
               />
               <Select
@@ -248,7 +259,9 @@ export default function AdminClassAssignmentPage() {
               <Select
                 label="Subject"
                 value={assignmentForm.subjectId || ''}
-                onChange={(e) => setAssignmentForm({ ...assignmentForm, subjectId: e.target.value })}
+                onChange={(e) =>
+                  setAssignmentForm({ ...assignmentForm, subjectId: e.target.value })
+                }
                 options={subjects.map((s) => ({ label: s.name, value: s.id }))}
               />
               <label className="flex items-center gap-2">
@@ -260,18 +273,13 @@ export default function AdminClassAssignmentPage() {
                   }
                   className="rounded border-[var(--brand-border)]"
                 />
-                <span className="text-sm text-[var(--brand-surface-contrast)]">
-                  Class Teacher
-                </span>
+                <span className="text-sm text-[var(--brand-surface-contrast)]">Class Teacher</span>
               </label>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setShowTeacherModal(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleAssignTeacher}
-                  loading={assignTeacherMutation.isPending}
-                >
+                <Button onClick={handleAssignTeacher} loading={assignTeacherMutation.isPending}>
                   Assign
                 </Button>
               </div>
@@ -282,4 +290,3 @@ export default function AdminClassAssignmentPage() {
     </RouteMeta>
   );
 }
-
