@@ -84,6 +84,27 @@ interface DbUserRow {
   status?: string | null; // May be null if migration hasn't run
 }
 
+type UserStatus = 'pending' | 'active' | 'suspended' | 'rejected';
+
+const VALID_USER_STATUSES = new Set<UserStatus>(['pending', 'active', 'suspended', 'rejected']);
+
+function resolveUserStatus(user: DbUserRow): UserStatus {
+  if (user.status && VALID_USER_STATUSES.has(user.status as UserStatus)) {
+    return user.status as UserStatus;
+  }
+
+  const shouldTreatAsActive =
+    user.role === 'superadmin' || user.role === 'admin' || user.is_verified === true;
+
+  const fallbackStatus: UserStatus = shouldTreatAsActive ? 'active' : 'pending';
+
+  console.warn(
+    `[auth] User ${user.id} missing status metadata (role=${user.role}); inferring '${fallbackStatus}'.`
+  );
+
+  return fallbackStatus;
+}
+
 async function findTenantById(pool: Pool, tenantId: string) {
   const result = await pool.query(`SELECT * FROM shared.tenants WHERE id = $1`, [tenantId]);
   return result.rows[0];
@@ -263,34 +284,26 @@ export async function login(input: LoginInput, context?: SessionContext): Promis
     let accessToken: string;
     let refreshToken: string;
     let expiresAt: Date;
-    
-    try {
-      payload = buildTokenPayload(user);
-      accessToken = generateAccessToken(payload);
-      const refreshResult = generateRefreshToken(payload);
-      refreshToken = refreshResult.token;
-      expiresAt = refreshResult.expiresAt;
-    } catch (tokenError) {
-      console.error('[auth] Token generation error:', tokenError);
-      throw new Error('Failed to generate authentication tokens');
-    }
 
-    try {
-      await storeRefreshToken(pool, user.id, refreshToken, expiresAt);
-    } catch (storeError) {
-      console.error('[auth] Failed to store refresh token:', storeError);
-      // Don't fail login if refresh token storage fails - user can still login
-    }
+      try {
+        payload = buildTokenPayload(user);
+        accessToken = generateAccessToken(payload);
+        const refreshResult = generateRefreshToken(payload);
+        refreshToken = refreshResult.token;
+        expiresAt = refreshResult.expiresAt;
+      } catch (tokenError) {
+        console.error('[auth] Token generation error:', tokenError);
+        throw new Error('Failed to generate authentication tokens');
+      }
 
-    // Safely get status - handle case where column might not exist
-    let userStatus: 'pending' | 'active' | 'suspended' | 'rejected' = 'pending';
-    if (user.status) {
-      userStatus = user.status as 'pending' | 'active' | 'suspended' | 'rejected';
-    } else {
-      // If status column doesn't exist or is null, default to 'pending'
-      // This handles cases where migrations haven't run yet
-      console.warn(`[auth] User ${user.id} has no status, defaulting to 'pending'`);
-    }
+      try {
+        await storeRefreshToken(pool, user.id, refreshToken, expiresAt);
+      } catch (storeError) {
+        console.error('[auth] Failed to store refresh token:', storeError);
+        // Don't fail login if refresh token storage fails - user can still login
+      }
+
+      const userStatus = resolveUserStatus(user);
 
     const response: AuthResponse = {
       accessToken,
@@ -336,7 +349,7 @@ export async function refreshToken(token: string, context?: SessionContext): Pro
   const tokenInfo = await verifyRefreshToken(pool, token);
 
   const userResult = await pool.query(
-    `SELECT id, email, role, tenant_id, is_verified FROM shared.users WHERE id = $1`,
+    `SELECT id, email, role, tenant_id, is_verified, status FROM shared.users WHERE id = $1`,
     [tokenInfo.userId]
   );
 
@@ -354,6 +367,8 @@ export async function refreshToken(token: string, context?: SessionContext): Pro
 
   await rotateSessionToken(user.id, token, newRefreshToken, context);
 
+  const userStatus = resolveUserStatus(user);
+
   return {
     accessToken,
     refreshToken: newRefreshToken,
@@ -364,7 +379,7 @@ export async function refreshToken(token: string, context?: SessionContext): Pro
       role: user.role,
       tenantId: user.tenant_id,
       isVerified: user.is_verified,
-      status: (user.status as 'pending' | 'active' | 'suspended' | 'rejected') ?? 'pending'
+      status: userStatus
     }
   };
 }
