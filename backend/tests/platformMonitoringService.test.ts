@@ -31,11 +31,29 @@ describe('platformMonitoringService', () => {
   });
 
   beforeEach(async () => {
-    await pool.query('DELETE FROM shared.user_sessions');
-    await pool.query('DELETE FROM shared.notifications');
-    await pool.query('DELETE FROM shared.audit_logs');
-    await pool.query('DELETE FROM shared.users');
-    await pool.query('DELETE FROM shared.tenants');
+    // Create user_sessions table if it doesn't exist (for pg-mem compatibility)
+    // Use uuid_generate_v4() which is registered in testDb.ts for pg-mem
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS shared.user_sessions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES shared.users(id) ON DELETE CASCADE,
+        refresh_token_hash TEXT UNIQUE,
+        login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        logout_at TIMESTAMPTZ,
+        login_ip TEXT,
+        login_user_agent TEXT,
+        logout_ip TEXT,
+        logout_user_agent TEXT
+      )
+    `).catch(() => {
+      // Table might already exist, ignore error
+    });
+    
+    await pool.query('DELETE FROM shared.user_sessions').catch(() => {});
+    await pool.query('DELETE FROM shared.notifications').catch(() => {});
+    await pool.query('DELETE FROM shared.audit_logs').catch(() => {});
+    await pool.query('DELETE FROM shared.users').catch(() => {});
+    await pool.query('DELETE FROM shared.tenants').catch(() => {});
 
     tenantId = crypto.randomUUID();
     superUserId = crypto.randomUUID();

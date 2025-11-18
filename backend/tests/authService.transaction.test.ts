@@ -16,15 +16,35 @@ describe('Auth Service - Transaction Rollback', () => {
   });
 
   beforeEach(async () => {
-    // Clean up any test data
-    await pool.query('DELETE FROM shared.users WHERE email LIKE $1', ['test-%']);
-    await pool.query('DELETE FROM shared.tenants WHERE name LIKE $1', ['Test School%']);
+    // Clean up any test data - wrap in try-catch to handle connection errors gracefully
+    try {
+      await pool.query('DELETE FROM shared.users WHERE email LIKE $1', ['test-%']);
+    } catch (error) {
+      // Ignore connection errors in cleanup
+      console.warn('Cleanup error (ignored):', error);
+    }
+    try {
+      await pool.query('DELETE FROM shared.tenants WHERE name LIKE $1', ['Test School%']);
+    } catch (error) {
+      // Ignore connection errors in cleanup
+      console.warn('Cleanup error (ignored):', error);
+    }
   });
 
   afterEach(async () => {
-    // Clean up test data after each test
-    await pool.query('DELETE FROM shared.users WHERE email LIKE $1', ['test-%']);
-    await pool.query('DELETE FROM shared.tenants WHERE name LIKE $1', ['Test School%']);
+    // Clean up test data after each test - wrap in try-catch to handle connection errors gracefully
+    try {
+      await pool.query('DELETE FROM shared.users WHERE email LIKE $1', ['test-%']);
+    } catch (error) {
+      // Ignore connection errors in cleanup
+      console.warn('Cleanup error (ignored):', error);
+    }
+    try {
+      await pool.query('DELETE FROM shared.tenants WHERE name LIKE $1', ['Test School%']);
+    } catch (error) {
+      // Ignore connection errors in cleanup
+      console.warn('Cleanup error (ignored):', error);
+    }
   });
 
   it('should rollback transaction if tenant schema creation fails', async () => {

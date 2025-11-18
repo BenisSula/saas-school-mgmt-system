@@ -62,17 +62,9 @@ export async function recordLoginEvent(
     const sessionId = crypto.randomUUID();
     const { ip, userAgent } = normaliseContext(context);
 
-    // Check if user_sessions table exists before inserting
-    const tableCheck = await pool.query(`
-      SELECT EXISTS (
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = 'shared' 
-          AND table_name = 'user_sessions'
-      )
-    `);
-
-    if (tableCheck.rows[0]?.exists) {
+    // Try to insert directly - if table doesn't exist, the error will be caught
+    // This approach works better with pg-mem which doesn't fully support information_schema
+    try {
       await pool.query(
         `
           INSERT INTO shared.user_sessions (
@@ -98,6 +90,15 @@ export async function recordLoginEvent(
         `,
         [sessionId, userId, refreshTokenHash, ip, userAgent]
       );
+    } catch (insertError) {
+      // If table doesn't exist, that's okay - session tracking is non-critical
+      // Check if it's a "relation does not exist" error
+      const errorMessage = insertError instanceof Error ? insertError.message : String(insertError);
+      if (!errorMessage.includes('does not exist') && !errorMessage.includes('relation')) {
+        // Re-throw if it's a different error (e.g., constraint violation)
+        throw insertError;
+      }
+      // Otherwise, silently ignore - table doesn't exist yet
     }
 
     // Record audit log - don't fail if this fails

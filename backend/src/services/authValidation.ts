@@ -91,10 +91,10 @@ export function validateSignupInput(input: SignUpInputRaw): SignUpInputNormalize
     );
   }
 
-  // Additional RBAC: Admin can only register when creating new tenant
-  if (role === 'admin' && !input.tenantName) {
+  // Additional RBAC: Admin can register with either tenantName (new org) or tenantId (existing org)
+  if (role === 'admin' && !input.tenantName && !input.tenantId) {
     throw new ValidationError(
-      'Admin registration requires creating a new organization',
+      'Admin registration requires either creating a new organization (tenantName) or joining an existing one (tenantId)',
       'tenantName'
     );
   }
