@@ -77,7 +77,7 @@ export function useManagementPage<T extends BaseFilters, TData, TRecord extends 
 
   // Use filters hook
   const { filters, filteredData, updateFilter, resetFilters, hasActiveFilters, setFilters } =
-    useFilters(defaultFilters, filterFn, records);
+    useFilters(defaultFilters, filterFn, records as unknown[]);
 
   // Use bulk operations hook
   const bulkOps = useBulkOperations({

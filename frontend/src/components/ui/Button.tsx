@@ -54,7 +54,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     // Extract animation-related props that conflict with framer-motion
     // These are excluded from props via Omit in ButtonProps interface
-    const { ...restProps } = props;
+    const {
+      onAnimationStart: _onAnimationStart,
+      onAnimationEnd: _onAnimationEnd,
+      onAnimationIteration: _onAnimationIteration,
+      ...restProps
+    } = props;
 
     return (
       <motion.button
@@ -67,7 +72,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         whileHover={!isDisabled ? buttonPress.hover : undefined}
         whileTap={!isDisabled ? buttonPress.tap : undefined}
         transition={{ duration: 0.15 }}
-        {...(restProps as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+        {...restProps}
       >
         {loading && (
           <span

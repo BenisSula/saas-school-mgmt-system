@@ -488,7 +488,7 @@ export function StudentsManagementPage() {
                         {selectedStudentDetail.subjects.length > 0 ? (
                           selectedStudentDetail.subjects.map((subject) => (
                             <span
-                              key={subject.id}
+                              key={subject.subjectId}
                               className="rounded-full bg-[var(--brand-primary)]/20 px-2 py-1 text-xs text-[var(--brand-primary)]"
                             >
                               {subject.name}

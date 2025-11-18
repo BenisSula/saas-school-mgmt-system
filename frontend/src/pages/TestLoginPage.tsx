@@ -56,7 +56,7 @@ export function TestLoginPage() {
     setIsLoading(true);
 
     try {
-      await loginUser(testEmail, testPassword);
+      await loginUser({ email: testEmail, password: testPassword });
       toast.success('Login successful!');
       // Wait a moment for user state to update, then navigate
       setTimeout(() => {
@@ -78,7 +78,7 @@ export function TestLoginPage() {
 
     setIsLoading(true);
     try {
-      await loginUser(email, password);
+      await loginUser({ email, password });
       toast.success('Login successful!');
       setTimeout(() => {
         navigate('/dashboard', { replace: true });

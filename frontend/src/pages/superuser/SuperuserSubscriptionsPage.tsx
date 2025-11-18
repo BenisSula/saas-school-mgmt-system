@@ -26,7 +26,7 @@ export default function SuperuserSubscriptionsPage() {
         subscriptionType: payload.subscriptionType
       });
     },
-    [queryKeys.superuser.schools(), queryKeys.superuser.subscriptions()],
+    [queryKeys.superuser.schools(), queryKeys.superuser.subscriptions()] as unknown[][],
     { successMessage: 'Subscription updated successfully' }
   );
 
@@ -49,7 +49,7 @@ export default function SuperuserSubscriptionsPage() {
     const revenueByTier = new Map<SubscriptionTier, number>();
     schools.forEach((school) => {
       const tier = school.subscriptionType || 'trial';
-      const monthlyPrice = tier === 'paid' ? 99 : tier === 'premium' ? 199 : 0;
+      const monthlyPrice = tier === 'paid' ? 99 : 0;
       revenueByTier.set(tier, (revenueByTier.get(tier) || 0) + monthlyPrice);
     });
     return Array.from(revenueByTier.entries())
@@ -62,7 +62,7 @@ export default function SuperuserSubscriptionsPage() {
 
   const stats = useMemo(() => {
     const totalRevenue = revenueData.reduce((sum, item) => sum + item.value, 0);
-    const paidSubscriptions = schools.filter((s) => s.subscriptionType === 'paid' || s.subscriptionType === 'premium').length;
+    const paidSubscriptions = schools.filter((s) => s.subscriptionType === 'paid').length;
     const trialSubscriptions = schools.filter((s) => s.subscriptionType === 'trial').length;
 
     return {

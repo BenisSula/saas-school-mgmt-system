@@ -30,7 +30,7 @@ export interface DataTableProps<T> {
   responsive?: boolean;
 }
 
-export function DataTable<T = Record<string, unknown>>({
+export function DataTable<T extends Record<string, unknown> = Record<string, unknown>>({
   data,
   columns,
   searchable = true,
@@ -56,7 +56,7 @@ export function DataTable<T = Record<string, unknown>>({
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter((row) =>
-        Object.values(row).some((val) => String(val).toLowerCase().includes(term))
+        Object.values(row as Record<string, unknown>).some((val) => String(val).toLowerCase().includes(term))
       );
     }
 
@@ -65,8 +65,8 @@ export function DataTable<T = Record<string, unknown>>({
       const column = columns.find((col) => col.key === sortColumn);
       if (column?.sortable) {
         result.sort((a, b) => {
-          const aVal = String(a[sortColumn] || '');
-          const bVal = String(b[sortColumn] || '');
+          const aVal = String((a as Record<string, unknown>)[sortColumn] || '');
+          const bVal = String((b as Record<string, unknown>)[sortColumn] || '');
           const comparison = aVal.localeCompare(bVal);
           return sortDirection === 'asc' ? comparison : -comparison;
         });

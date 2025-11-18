@@ -32,9 +32,11 @@ export function useStudentDashboard() {
 
   const resultQuery = useQuery(
     ['student', 'dashboard', 'result', user?.id, latestExamQuery.data?.examId],
-    () => {
-      if (!latestExamQuery.data?.examId) return null;
-      return api.getStudentResult(user!.id, latestExamQuery.data.examId);
+    async () => {
+      if (!latestExamQuery.data?.examId || !user?.id) {
+        throw new Error('Missing exam ID or user ID');
+      }
+      return api.getStudentResult(user.id, latestExamQuery.data.examId);
     },
     { enabled: !!user?.id && !!latestExamQuery.data?.examId }
   );

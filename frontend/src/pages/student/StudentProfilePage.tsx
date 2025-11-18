@@ -336,7 +336,9 @@ export default function StudentProfilePage() {
           <Section
             isEmpty={true}
             emptyMessage="Academic history will be displayed here when available"
-          />
+          >
+            {null}
+          </Section>
         )
       },
       {

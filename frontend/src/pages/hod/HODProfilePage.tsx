@@ -30,7 +30,7 @@ export default function HODProfilePage() {
           const user = usersData.value.find((u) => u.email === teacherProfile.email);
           const isHOD = user?.additional_roles?.some((r) => r.role === 'hod');
 
-          if (isHOD) {
+          if (isHOD && user) {
             // Extract department from metadata
             const hodRole = user.additional_roles?.find((r) => r.role === 'hod');
             const department =
@@ -230,7 +230,9 @@ export default function HODProfilePage() {
           <Section
             isEmpty={true}
             emptyMessage="Department analytics will be displayed here when available"
-          />
+          >
+            {null}
+          </Section>
         )
       },
       {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutationWithInvalidation, queryKeys } from '../../hooks/useQuery';
 import { useClasses } from '../../hooks/queries/useAdminQueries';
 import { useQuery } from '../../hooks/useQuery';
@@ -61,7 +61,7 @@ export default function AdminAttendancePage() {
     async (records: AttendanceMark[]) => {
       await api.markAttendance(records);
     },
-    [queryKeys.admin.attendance()],
+    [queryKeys.admin.attendance()] as unknown[][],
     { successMessage: 'Attendance saved successfully' }
   );
 

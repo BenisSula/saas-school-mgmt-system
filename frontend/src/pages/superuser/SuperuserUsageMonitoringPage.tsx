@@ -31,7 +31,7 @@ export default function SuperuserUsageMonitoringPage() {
   // Generate usage data for each tenant
   const tenantUsageData: UsageData[] = useMemo(() => {
     // If a specific tenant is selected, use that tenant's usage data
-    if (selectedTenantId !== 'all' && tenantUsage && 'tenantId' in tenantUsage) {
+    if (selectedTenantId !== 'all' && tenantUsage && 'tenantId' in tenantUsage && tenantUsage.tenantId) {
       return [{
         tenantId: tenantUsage.tenantId,
         tenantName: schools.find(s => s.id === tenantUsage.tenantId)?.name || 'Unknown',

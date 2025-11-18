@@ -5,7 +5,7 @@ import { fadeIn, staggerContainer, staggerItem } from '../../lib/utils/animation
 
 export interface TableColumn<T> {
   key?: keyof T | string;
-  header: string;
+  header: string | ReactNode;
   align?: 'left' | 'center' | 'right';
   render?: (row: T, rowIndex?: number, columnIndex?: number) => ReactNode;
 }

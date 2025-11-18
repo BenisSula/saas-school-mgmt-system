@@ -32,9 +32,10 @@ export default function AdminExamConfigPage() {
   const deleteExamMutation = useMutationWithInvalidation(
     async (examId: string) => {
       // TODO: Implement backend endpoint
-      await api.deleteExam(examId);
+      // Note: deleteExam API endpoint not yet implemented
+      throw new Error('Delete exam functionality not yet implemented');
     },
-    [queryKeys.admin.exams()],
+    [queryKeys.admin.exams()] as unknown[][],
     { successMessage: 'Exam deleted successfully' }
   );
 

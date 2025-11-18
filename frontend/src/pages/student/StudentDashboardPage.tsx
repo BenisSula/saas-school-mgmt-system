@@ -68,7 +68,7 @@ export default function StudentDashboardPage() {
   const subjectPerformance: BarChartData[] = useMemo(() => {
     if (!result?.breakdown) return [];
     return result.breakdown.map((subject) => ({
-      label: subject.subject_name,
+      label: subject.subject,
       value: subject.score,
       color: subject.score >= 70 ? 'var(--brand-primary)' : subject.score >= 50 ? '#f59e0b' : '#ef4444'
     }));

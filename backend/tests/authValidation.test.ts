@@ -74,7 +74,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow('Invalid email format');
     });
 
@@ -86,7 +86,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/Password validation failed/);
     });
 
@@ -98,7 +98,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
     });
 
     it('should reject password without lowercase', () => {
@@ -109,7 +109,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
     });
 
     it('should reject password without number', () => {
@@ -120,7 +120,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
     });
 
     it('should reject password without symbol', () => {
@@ -131,7 +131,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
     });
 
     it('should reject invalid role', () => {
@@ -142,7 +142,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/Invalid role/);
     });
 
@@ -154,7 +154,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/not allowed for self-registration/);
     });
 
@@ -166,7 +166,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
     });
 
     it('should reject admin without tenant name', () => {
@@ -176,7 +176,7 @@ describe('Auth Validation', () => {
         role: 'admin'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/requires creating a new organization/);
     });
 
@@ -187,7 +187,7 @@ describe('Auth Validation', () => {
         role: 'student'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/tenantId is required/);
     });
 
@@ -198,7 +198,7 @@ describe('Auth Validation', () => {
         role: 'teacher'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
     });
 
     it('should sanitize tenant name', () => {
@@ -221,7 +221,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/Email is required/);
     });
 
@@ -233,7 +233,7 @@ describe('Auth Validation', () => {
         tenantId: 'tenant-123'
       };
 
-      expect(() => validateSignupInput(input)).toThrow(ValidationError);
+      expect(() => validateSignupInput(input)).toThrowError(ValidationError);
       expect(() => validateSignupInput(input)).toThrow(/Password is required/);
     });
   });

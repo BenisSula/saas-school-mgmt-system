@@ -50,14 +50,13 @@ export default function AdminClassAssignmentPage() {
     async (payload: { studentId: string; classId: string }) => {
       await api.updateStudent(payload.studentId, { classId: payload.classId });
     },
-    [queryKeys.admin.students(), queryKeys.admin.classes()],
+    [queryKeys.admin.students(), queryKeys.admin.classes()] as unknown[][],
     { successMessage: 'Student assigned to class successfully' }
   );
 
   const assignTeacherMutation = useMutationWithInvalidation(
     async (payload: { teacherId: string; classId: string; subjectId: string; isClassTeacher: boolean }) => {
-      await api.admin.assignTeacher({
-        teacherId: payload.teacherId,
+      await api.admin.assignTeacher(payload.teacherId, {
         classId: payload.classId,
         subjectId: payload.subjectId,
         isClassTeacher: payload.isClassTeacher
