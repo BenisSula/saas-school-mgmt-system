@@ -1,4 +1,4 @@
-import { useQuery, queryKeys } from '../useQuery';
+import { useQuery } from '../useQuery';
 import { api } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 

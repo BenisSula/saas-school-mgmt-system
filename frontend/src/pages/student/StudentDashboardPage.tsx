@@ -10,8 +10,8 @@ import { StatCard } from '../../components/charts/StatCard';
 import { useStudentDashboard } from '../../hooks/queries/useDashboardQueries';
 import { useAuth } from '../../context/AuthContext';
 import { TrendingUp, Calendar, DollarSign, GraduationCap } from 'lucide-react';
-import type { AttendanceHistoryItem, Invoice, StudentResult } from '../../lib/api';
-import { formatDate } from '../../lib/utils/date';
+import type { AttendanceHistoryItem } from '../../lib/api';
+import { formatDate, formatDateShort } from '../../lib/utils/date';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 
 const RECENT_ATTENDANCE_LIMIT = 7;
@@ -19,7 +19,7 @@ const RECENT_ATTENDANCE_LIMIT = 7;
 export default function StudentDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { attendance, invoices, profile, result, roster, loading, error } = useStudentDashboard();
+  const { attendance, invoices, profile, result, loading, error } = useStudentDashboard();
 
   const attendanceSummary = useMemo(() => {
     if (!attendance) return { present: 0, total: 0, percentage: 0, recent: [] };
@@ -58,7 +58,7 @@ export default function StudentDashboardPage() {
   // Attendance trend chart data
   const attendanceTrend: LineChartDataPoint[] = useMemo(() => {
     if (!attendance?.history) return [];
-    return attendance.history.slice(-30).map((item, index) => ({
+    return attendance.history.slice(-30).map((item) => ({
       label: formatDateShort(item.attendance_date),
       value: item.status === 'present' ? 1 : item.status === 'late' ? 0.5 : 0
     }));
@@ -198,7 +198,7 @@ export default function StudentDashboardPage() {
                   Profile snapshot
                 </h2>
                 <p className="text-sm text-[var(--brand-muted)]">
-                  Here's a quick overview of your class placement and enrolled subjects.
+                  Here&apos;s a quick overview of your class placement and enrolled subjects.
                 </p>
               </div>
               <Button variant="outline" onClick={() => navigate('/student/profile')}>

@@ -10,7 +10,6 @@ import { StatusBanner } from '../../components/ui/StatusBanner';
 import { DashboardSkeleton } from '../../components/ui/DashboardSkeleton';
 import { api, type PlatformUserSummary, type Role, type UserStatus } from '../../lib/api';
 import { formatDate, formatDateTime } from '../../lib/utils/date';
-import { StatusBadge } from '../../components/ui/StatusBadge';
 
 type FilterRole = Role | 'all';
 type FilterStatus = UserStatus | 'all' | 'pending';

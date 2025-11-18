@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useMutationWithInvalidation, queryKeys } from '../../hooks/useQuery';
-import { useExams, useClasses } from '../../hooks/queries/useAdminQueries';
+import { useExams } from '../../hooks/queries/useAdminQueries';
 import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Modal } from '../../components/ui/Modal';
-import { api, type ExamSummary, type GradeScale } from '../../lib/api';
+import { api, type ExamSummary } from '../../lib/api';
 import RouteMeta from '../../components/layout/RouteMeta';
-import { toast } from 'sonner';
 import type { FormEvent } from 'react';
 import { formatDate } from '../../lib/utils/date';
 
@@ -16,13 +15,10 @@ export default function AdminExamConfigPage() {
   const [showExamModal, setShowExamModal] = useState(false);
   const [showScaleModal, setShowScaleModal] = useState(false);
   const [examForm, setExamForm] = useState({ name: '', description: '', examDate: '' });
-  const [scaleForm, setScaleForm] = useState({ grade: '', min: '', max: '', remark: '' });
 
   const { data: examsData, isLoading: examsLoading } = useExams();
-  const { data: classesData } = useClasses();
 
   const exams = examsData || [];
-  const classes = classesData || [];
 
   const createExamMutation = useMutationWithInvalidation(
     async (payload: { name: string; description?: string; examDate?: string }) => {

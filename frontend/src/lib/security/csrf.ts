@@ -4,6 +4,8 @@
 
 import { getCsrfToken } from './tokenSecurity';
 
+// RequestInit is a built-in type from the DOM lib, available in TypeScript
+
 /**
  * Get CSRF token from cookie and add to request headers
  */
@@ -22,10 +24,12 @@ export function getCsrfHeader(): Record<string, string> {
  */
 export async function fetchWithCsrf(
   url: string,
+  // eslint-disable-next-line no-undef
   options: RequestInit = {}
 ): Promise<Response> {
   const csrfHeaders = getCsrfHeader();
   
+  // eslint-disable-next-line no-undef
   const enhancedOptions: RequestInit = {
     ...options,
     headers: {

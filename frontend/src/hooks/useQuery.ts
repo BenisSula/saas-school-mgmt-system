@@ -1,5 +1,4 @@
 import { useQuery as useReactQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
 import { toast } from 'sonner';
 
 // Query keys factory

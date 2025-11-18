@@ -19,7 +19,7 @@ export default function AdminOverviewPage() {
   const queryClient = useQueryClient();
   const { data, isLoading, error } = useAdminOverview();
 
-  const { school, users = [], teachers = [], students = [], classes = [] } = data || {};
+  const { school, users = [], teachers = [], students = [] } = data || {};
 
   const stats = useMemo(() => {
     const totalUsers = users.length;

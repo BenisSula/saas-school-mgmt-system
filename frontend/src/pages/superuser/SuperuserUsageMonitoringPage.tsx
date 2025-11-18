@@ -7,8 +7,7 @@ import { DataTable, type DataTableColumn } from '../../components/tables/DataTab
 import { Select } from '../../components/ui/Select';
 import RouteMeta from '../../components/layout/RouteMeta';
 import { Activity, Database, Zap, TrendingUp } from 'lucide-react';
-import type { PlatformSchool } from '../../lib/api';
-import { formatDate, formatDateTime } from '../../lib/utils/date';
+import { formatDate } from '../../lib/utils/date';
 import { formatNumber } from '../../lib/utils/data';
 
 interface UsageData {

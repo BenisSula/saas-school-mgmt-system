@@ -53,12 +53,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     // Extract animation-related props that conflict with framer-motion
-    const {
-      onAnimationStart,
-      onAnimationEnd,
-      onAnimationIteration,
-      ...restProps
-    } = props;
+    // These are excluded from props via Omit in ButtonProps interface
+    const { ...restProps } = props;
 
     return (
       <motion.button

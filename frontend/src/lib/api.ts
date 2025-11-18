@@ -110,13 +110,10 @@ if (!isAbsoluteHttpUrl(API_BASE_URL)) {
 }
 
 if (import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
   console.log('[SUMANO][API_BASE_URL]', API_BASE_URL);
   // Validate window context
   if (typeof window !== 'undefined') {
-    // eslint-disable-next-line no-console
     console.log('[SUMANO][WINDOW_ORIGIN]', window.location.origin);
-    // eslint-disable-next-line no-console
     console.log('[SUMANO][WINDOW_HREF]', window.location.href);
   }
 }

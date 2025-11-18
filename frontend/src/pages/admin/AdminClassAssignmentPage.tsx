@@ -5,8 +5,7 @@ import { DataTable, type DataTableColumn } from '../../components/tables/DataTab
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
-import { Input } from '../../components/ui/Input';
-import { api, type SchoolClass, type StudentRecord, type TeacherProfile, type Subject } from '../../lib/api';
+import { api, type StudentRecord } from '../../lib/api';
 import RouteMeta from '../../components/layout/RouteMeta';
 import { toast } from 'sonner';
 
@@ -29,13 +28,13 @@ export default function AdminClassAssignmentPage() {
 
   const { data: classesData, isLoading: classesLoading } = useClasses();
   const { data: studentsData, isLoading: studentsLoading } = useStudents();
-  const { data: teachersData, isLoading: teachersLoading } = useTeachers();
-  const { data: subjectsData, isLoading: subjectsLoading } = useSubjects();
+  const { data: teachersData } = useTeachers();
+  const { data: subjectsData } = useSubjects();
 
-  const classes = classesData || [];
-  const students = studentsData || [];
-  const teachers = teachersData || [];
-  const subjects = subjectsData || [];
+  const classes = useMemo(() => classesData || [], [classesData]);
+  const students = useMemo(() => studentsData || [], [studentsData]);
+  const teachers = useMemo(() => teachersData || [], [teachersData]);
+  const subjects = useMemo(() => subjectsData || [], [subjectsData]);
 
   const selectedClass = useMemo(
     () => classes.find((c) => c.id === selectedClassId),

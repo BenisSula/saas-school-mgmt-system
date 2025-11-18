@@ -1,48 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useMutationWithInvalidation, queryKeys } from '../../hooks/useQuery';
-import { useSubscriptions, useSchools } from '../../hooks/queries/useSuperuserQueries';
+import { useSchools } from '../../hooks/queries/useSuperuserQueries';
 import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
 import { BarChart, type BarChartData } from '../../components/charts/BarChart';
 import { PieChart, type PieChartData } from '../../components/charts/PieChart';
 import { StatCard } from '../../components/charts/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import RouteMeta from '../../components/layout/RouteMeta';
 import { CreditCard, DollarSign, TrendingUp, Users } from 'lucide-react';
-import type { PlatformSchool, SubscriptionTier } from '../../lib/api';
+import { api, type SubscriptionTier, type PlatformSchool } from '../../lib/api';
 import { formatNumber } from '../../lib/utils/data';
-
-interface SubscriptionTierConfig {
-  id: string;
-  name: string;
-  tier: SubscriptionTier;
-  price: number;
-  billingCycle: 'monthly' | 'yearly';
-  features: string[];
-  maxUsers: number | null;
-  maxStorage: number | null;
-  isActive: boolean;
-}
 
 export default function SuperuserSubscriptionsPage() {
   const [showTierModal, setShowTierModal] = useState(false);
-  const [tierForm, setTierForm] = useState<Partial<SubscriptionTierConfig>>({
-    tier: 'trial',
-    price: 0,
-    billingCycle: 'monthly',
-    features: [],
-    maxUsers: null,
-    maxStorage: null,
-    isActive: true
-  });
 
   const { data: schoolsData, isLoading: schoolsLoading } = useSchools();
-  const { data: subscriptionsData } = useSubscriptions();
 
   const schools = schoolsData || [];
-  const subscriptions = subscriptionsData || [];
 
   const updateSubscriptionMutation = useMutationWithInvalidation(
     async (payload: { schoolId: string; subscriptionType: SubscriptionTier }) => {

@@ -10,7 +10,7 @@ import { useSuperuserOverview } from '../../hooks/queries/useSuperuserQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/useQuery';
 import { Button } from '../../components/ui/Button';
-import { api, type PlatformOverview, type SubscriptionTier } from '../../lib/api';
+import type { PlatformOverview, SubscriptionTier } from '../../lib/api';
 import { Building2, Users, AlertCircle, DollarSign } from 'lucide-react';
 import { formatDate } from '../../lib/utils/date';
 import { StatusBadge } from '../../components/ui/StatusBadge';

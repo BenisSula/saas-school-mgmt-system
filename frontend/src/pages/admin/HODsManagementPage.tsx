@@ -80,11 +80,12 @@ export function HODsManagementPage() {
   }, [loadData]);
 
   // Filter HODs: teachers with additional_roles containing 'hod'
-  const hods = useMemo(() => {
-    const hodUsers = users.filter(
-      (u) => u.role === 'teacher' && u.additional_roles?.some((r) => r.role === 'hod')
-    );
+  const hodUsers = useMemo(
+    () => users.filter((u) => u.role === 'teacher' && u.additional_roles?.some((r) => r.role === 'hod')),
+    [users]
+  );
 
+  const hods = useMemo(() => {
     return hodUsers
       .map((user) => {
         const teacher = teachers.find((t) => t.email === user.email);
@@ -110,7 +111,7 @@ export function HODsManagementPage() {
         } as HODRecord;
       })
       .filter((hod): hod is HODRecord => hod !== null);
-  }, [users, teachers]);
+  }, [hodUsers, teachers]);
 
   const filteredHODs = useMemo(() => {
     return hods.filter((hod) => {

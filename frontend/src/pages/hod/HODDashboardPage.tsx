@@ -13,41 +13,19 @@ import type { TeacherProfile } from '../../lib/api';
 export default function HODDashboardPage() {
   const { department, loading, error } = useHODDashboard();
 
-  if (loading) {
-    return (
-      <RouteMeta title="HOD Dashboard">
-        <DashboardSkeleton />
-      </RouteMeta>
-    );
-  }
-
-  if (error) {
-    return (
-      <RouteMeta title="HOD Dashboard">
-        <StatusBanner status="error" message={(error as Error).message} />
-      </RouteMeta>
-    );
-  }
-
-  if (!department) {
-    return (
-      <RouteMeta title="HOD Dashboard">
-        <StatusBanner status="info" message="No department data available yet." />
-      </RouteMeta>
-    );
-  }
-
-  // Teacher distribution chart
+  // Teacher distribution chart - must be before early returns
   const teacherDistribution: BarChartData[] = useMemo(() => {
-    return department.teachers.map((teacher, index) => ({
+    if (!department) return [];
+    return department.teachers.map((teacher) => ({
       label: teacher.name,
       value: teacher.subjects.length,
       color: 'var(--brand-primary)'
     }));
   }, [department]);
 
-  // Subject coverage chart
+  // Subject coverage chart - must be before early returns
   const subjectCoverage: PieChartData[] = useMemo(() => {
+    if (!department) return [];
     const subjectCounts = new Map<string, number>();
     department.teachers.forEach((teacher) => {
       teacher.subjects.forEach((subject) => {
@@ -61,13 +39,15 @@ export default function HODDashboardPage() {
   }, [department]);
 
   const teacherColumns: DataTableColumn<TeacherProfile>[] = useMemo(
-    () => [
-      {
-        key: 'name',
-        header: 'Teacher Name',
-        render: (row) => row.name,
-        sortable: true
-      },
+    () => {
+      if (!department) return [];
+      return [
+        {
+          key: 'name',
+          header: 'Teacher Name',
+          render: (row) => row.name,
+          sortable: true
+        },
       {
         key: 'email',
         header: 'Email',
@@ -100,9 +80,35 @@ export default function HODDashboardPage() {
         header: 'Classes',
         render: (row) => `${row.assigned_classes.length} classes`
       }
-    ],
-    []
+      ];
+    },
+    [department]
   );
+
+  // Early returns after all hooks
+  if (loading) {
+    return (
+      <RouteMeta title="HOD Dashboard">
+        <DashboardSkeleton />
+      </RouteMeta>
+    );
+  }
+
+  if (error) {
+    return (
+      <RouteMeta title="HOD Dashboard">
+        <StatusBanner status="error" message={(error as Error).message} />
+      </RouteMeta>
+    );
+  }
+
+  if (!department) {
+    return (
+      <RouteMeta title="HOD Dashboard">
+        <StatusBanner status="info" message="No department data available yet." />
+      </RouteMeta>
+    );
+  }
 
   return (
     <RouteMeta title="HOD Dashboard">

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutationWithInvalidation, queryKeys } from '../../hooks/useQuery';
 import { useClasses } from '../../hooks/queries/useAdminQueries';
 import { useQuery } from '../../hooks/useQuery';
@@ -6,11 +6,9 @@ import { DataTable, type DataTableColumn } from '../../components/tables/DataTab
 import { Button } from '../../components/ui/Button';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { Select } from '../../components/ui/Select';
-import { StatusBanner } from '../../components/ui/StatusBanner';
 import { useAuth } from '../../context/AuthContext';
-import { api, type AttendanceMark, type SchoolClass, type StudentRecord } from '../../lib/api';
+import { api, type AttendanceMark } from '../../lib/api';
 import RouteMeta from '../../components/layout/RouteMeta';
-import { toast } from 'sonner';
 import { defaultDate } from '../../lib/utils/date';
 
 type AttendanceStatus = 'present' | 'absent' | 'late';
@@ -48,7 +46,7 @@ export default function AdminAttendancePage() {
   const students = studentsData || [];
 
   // Initialize rows when students load
-  useMemo(() => {
+  useEffect(() => {
     if (students.length > 0 && rows.length === 0) {
       const attendanceRows: AttendanceRow[] = students.map((student) => ({
         studentId: student.id,

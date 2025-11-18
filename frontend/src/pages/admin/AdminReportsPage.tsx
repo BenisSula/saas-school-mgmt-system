@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
-import { useQuery, queryKeys } from '../../hooks/useQuery';
-import { useAttendance, useClasses, useStudents } from '../../hooks/queries/useAdminQueries';
+import { useAttendance, useClasses } from '../../hooks/queries/useAdminQueries';
 import { DataTable, type DataTableColumn } from '../../components/tables/DataTable';
 import { BarChart, type BarChartData } from '../../components/charts/BarChart';
 import { StatCard } from '../../components/charts/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { DatePicker } from '../../components/ui/DatePicker';
-import { api, type AttendanceAggregate, type GradeAggregate, type FeeAggregate } from '../../lib/api';
+import type { AttendanceAggregate } from '../../lib/api';
 import RouteMeta from '../../components/layout/RouteMeta';
 import { FileText, Download, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AdminReportsPage() {
   const [attendanceFilters, setAttendanceFilters] = useState({
@@ -17,35 +17,31 @@ export default function AdminReportsPage() {
     to: '',
     classId: ''
   });
-  const [examId, setExamId] = useState('');
-  const [feeStatus, setFeeStatus] = useState('');
 
   const { data: classesData } = useClasses();
-  const { data: studentsData } = useStudents();
   const { data: attendanceData, isLoading: attendanceLoading } = useAttendance(attendanceFilters);
 
-  const classes = classesData || [];
-  const students = studentsData || [];
-  const attendance = attendanceData || [];
-
-  // Grade data query
-  const { data: gradeData = [] } = useQuery(
-    queryKeys.admin.reports('grades'),
-    () => api.getGradeReport(examId),
-    { enabled: !!examId }
-  );
-
-  // Fee data query
-  const { data: feeData = [] } = useQuery(
-    queryKeys.admin.reports('fees'),
-    () => api.getFeeReport(feeStatus),
-    { enabled: !!feeStatus }
-  );
+  const attendance = useMemo(() => attendanceData || [], [attendanceData]);
+  const classes = useMemo(() => classesData || [], [classesData]);
 
   const attendanceChartData: BarChartData[] = useMemo(() => {
-    return attendance.map((item) => ({
-      label: item.className || 'Unknown',
-      value: item.presentCount || 0,
+    // Group by class_id and status
+    const grouped = attendance.reduce((acc, item) => {
+      const key = item.class_id || 'unknown';
+      if (!acc[key]) {
+        acc[key] = { present: 0, absent: 0 };
+      }
+      if (item.status === 'present') {
+        acc[key].present += item.count;
+      } else {
+        acc[key].absent += item.count;
+      }
+      return acc;
+    }, {} as Record<string, { present: number; absent: number }>);
+
+    return Object.entries(grouped).map(([classId, data]) => ({
+      label: classId === 'unknown' ? 'Unknown' : classId,
+      value: data.present,
       color: 'var(--brand-primary)'
     }));
   }, [attendance]);
@@ -53,32 +49,36 @@ export default function AdminReportsPage() {
   const attendanceColumns: DataTableColumn<AttendanceAggregate>[] = useMemo(
     () => [
       {
-        key: 'className',
+        key: 'class_id',
         header: 'Class',
-        render: (row) => row.className || '—'
+        render: (row) => row.class_id || '—'
       },
       {
-        key: 'presentCount',
-        header: 'Present',
-        render: (row) => row.presentCount || 0
+        key: 'status',
+        header: 'Status',
+        render: (row) => row.status
       },
       {
-        key: 'absentCount',
-        header: 'Absent',
-        render: (row) => row.absentCount || 0
+        key: 'count',
+        header: 'Count',
+        render: (row) => row.count
       },
       {
-        key: 'attendanceRate',
-        header: 'Rate',
-        render: (row) => `${((row.attendanceRate || 0) * 100).toFixed(1)}%`
+        key: 'attendance_date',
+        header: 'Date',
+        render: (row) => row.attendance_date
       }
     ],
     []
   );
 
   const stats = useMemo(() => {
-    const totalPresent = attendance.reduce((sum, item) => sum + (item.presentCount || 0), 0);
-    const totalAbsent = attendance.reduce((sum, item) => sum + (item.absentCount || 0), 0);
+    const totalPresent = attendance
+      .filter((item) => item.status === 'present')
+      .reduce((sum, item) => sum + item.count, 0);
+    const totalAbsent = attendance
+      .filter((item) => item.status === 'absent')
+      .reduce((sum, item) => sum + item.count, 0);
     const totalStudents = totalPresent + totalAbsent;
     const overallRate = totalStudents > 0 ? (totalPresent / totalStudents) * 100 : 0;
 
